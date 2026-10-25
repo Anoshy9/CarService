@@ -46,12 +46,18 @@ class ExtractedInvoice:
 # Dates : FR (31/12/2023, 31-12-2023, 31.12.2023), EN (12/31/2023, Dec 31, 2023),
 # IT (31/12/2023), DE (31.12.2023), etc.
 DATE_PATTERNS = [
-    r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})",          # 31/12/2023 ou 12/31/2023
-    r"(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})",          # 2023-12-31 (ISO)
-    r"(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+(\d{4})",
+    # Standard avec séparateurs
+    r"(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})",
+    r"(\d{4})[/\-.](\d{1,2})[/\-.](\d{1,2})",
+    # Avec espaces (OCR sépare parfois: "15 03 2024" ou "15  03  2024")
+    r"(\d{1,2})\s+(\d{1,2})\s+(\d{4})",
+    # Avec espaces et séparateurs mixtes ("15 / 03 / 2024", "15- 03-2024")
+    r"(\d{1,2})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{4})",
+    # Mois texte
+    r"(\d{1,2})\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(\d{4})",
     r"(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})",
     r"(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\s+(\d{4})",
-    r"(\d{1,2})\.\s*(Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(\d{4})",
+    r"(\d{1,2})\.\s*(Januar|Februar|März|Marz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(\d{4})",
 ]
 
 MONTHS_FR = {m: i + 1 for i, m in enumerate(
@@ -70,11 +76,16 @@ ALL_MONTHS = {**MONTHS_FR, **MONTHS_EN, **MONTHS_IT, **MONTHS_DE}
 
 # Montants : 1 234,56 € / 1,234.56 £ / 1.234,56 € / € 1234.56 / 1234,56 EUR ...
 MONEY_PATTERNS = [
+    # Standard: 1 234,56 € / 1.234,56 € / 1,234.56 €
     r"(\d{1,3}(?:[ \u00a0.]\d{3})*(?:[,\.]\d{2}))\s*(?:€|EUR|eur|EURO)",
     r"(?:€|EUR|eur)\s*(\d{1,3}(?:[ \u00a0.]\d{3})*(?:[,\.]\d{2}))",
     r"(\d{1,3}(?:,\d{3})*\.\d{2})\s*(?:GBP|£|pound)",
     r"(?:£|GBP)\s*(\d{1,3}(?:,\d{3})*\.\d{2})",
     r"(\d{1,3}(?:[ \u00a0.]\d{3})*(?:[,\.]\d{2}))\s*(?:CHF|Fr\.?)",
+    # OCR avec espace comme séparateur décimal: "242 04" ou "242 04 €"
+    r"(\d{1,3}(?:[ \u00a0.]\d{3})*\s\d{2})\s*(?:€|EUR|eur|EURO|GBP|£|CHF|$)",
+    # Nombre simple avec 2 décimales en fin de ligne
+    r"(\d{1,3}(?:[ \u00a0.]\d{3})*[,\.]\d{2})(?!\d)",
 ]
 
 # Kilométrage : "km 123456", "123 456 km", "chilometraggio 123456", "Kilometerstand 123456"
@@ -107,21 +118,29 @@ VAT_PATTERNS = [
 PHONE_PATTERNS = [
     r"(?:t[ée]l(?:[ée]phone)?|t[ao]l|tel|phone|tlf|telefono|telefon|telefone)\s*[:.\-]?\s*([+\d][\d\s.\-/()]{7,20})",
     r"(\+\d{1,3}[\s.\-]?(?:\d[\s.\-]?){6,14})",
-    r"(?<![\w])(0\d[\s.\-]?\d[\s.\-]?\d[\s.\-]?\d[\s.\-]?\d[\s.\-]?\d[\s.\-]?\d[\s.\-]?\d)(?![\w])",
+    r"(?<![\w])(0\d(?:[\s.\-]?\d){8})(?![\w])",
 ]
 
 # Pays (dans une adresse de garage)
 COUNTRY_KEYWORDS = {
-    "France": ["france", "francia", "frankreich", "frankrijk", r"\bFR\b", "française"],
-    "Italie": ["italie", "italia", "italien", "italy", "italia", r"\bIT\b"],
+    "France": ["france", "francia", "frankreich", "frankrijk", "francia", "francia",
+               "franoe", "francs", "francia", "paris", "lyon", "marseille", r"\bFR\b", "française"],
+    "Italie": ["italie", "italia", "italien", "italy", "italia", "italiano",
+               "milano", "milian", "milianq", "roma", "milan", "torino", "napoli", r"\bIT\b"],
     "Royaume-Uni": ["royaume-uni", "united kingdom", "great britain", "england", "angleterre",
-                    "inghilterra", "großbritannien", "engeland", "regno unito", "uk", r"\bGB\b", r"\bUK\b"],
-    "Allemagne": ["allemagne", "germany", "deutschland", "alemania", "duitsland", "germania", r"\bDE\b"],
-    "Espagne": ["espagne", "spain", "españa", "espana", "spanien", "spanje", "spagna", r"\bES\b"],
-    "Belgique": ["belgique", "belgium", "belgië", "belgien", "belgio", "belgica", r"\bBE\b"],
-    "Pays-Bas": ["pays-bas", "netherlands", "nederland", "niederlande", "paesi bassi", r"\bNL\b"],
-    "Suisse": ["suisse", "schweiz", "svizzera", "switzerland", "zwitserland", r"\bCH\b"],
-    "Portugal": ["portugal", r"\bPT\b"],
+                    "inghilterra", "großbritannien", "engeland", "regno unito", "london", "londra",
+                    "uk", r"\bGB\b", r"\bUK\b"],
+    "Allemagne": ["allemagne", "germany", "deutschland", "alemania", "duitsland", "germania",
+                  "berlin", "münchen", "munchen", "hamburg", r"\bDE\b"],
+    "Espagne": ["espagne", "spain", "españa", "espana", "spanien", "spanje", "spagna",
+                "madrid", "barcelona", "espana", r"\bES\b"],
+    "Belgique": ["belgique", "belgium", "belgië", "belgien", "belgio", "belgica",
+                 "bruxelles", "bruceru", "antwerp", r"\bBE\b"],
+    "Pays-Bas": ["pays-bas", "netherlands", "nederland", "niederlande", "paesi bassi",
+                 "amsterdam", "holland", "hollande", r"\bNL\b"],
+    "Suisse": ["suisse", "schweiz", "svizzera", "switzerland", "zwitserland",
+               "zurich", "genève", "geneve", r"\bCH\b"],
+    "Portugal": ["portugal", "lisboa", "lisbonne", "porto", r"\bPT\b"],
     "Luxembourg": ["luxembourg", "luxemburg", "lussemburgo", r"\bLU\b"],
 }
 
@@ -175,27 +194,46 @@ CT_RESULT_KEYWORDS = {
 
 
 def _parse_money(value: str) -> Optional[float]:
-    """Convertit une chaîne monétaire en float (gère FR 1 234,56 et EN 1,234.56)."""
-    v = value.strip().replace("\u00a0", " ").replace(" ", "")
+    """Convertit une chaîne monétaire en float (gère FR 1 234,56 / EN 1,234.56 / OCR 242 04)."""
+    import re as _re
+    v = value.strip().replace("\u00a0", " ").strip()
+
+    # Nettoyer les artefacts OCR: "242,04€5" -> "242,04", "242042" -> "242.04" si contexte décimal
+    v = _re.sub(r"([\d,\.]+)\s*[€£$]\s*\d+", r"\1", v)
+    v = _re.sub(r"(\d)([€£$])", r"\1", v)
+
+    # Gérer le cas OCR "242 04" (espace comme séparateur décimal)
+    # Pattern strict: 1-6 chiffres, espace, exactement 2 chiffres
+    m_space_dec = _re.match(r"^(\d{1,6})\s+(\d{2})$", v)
+    if m_space_dec:
+        v = m_space_dec.group(1) + "." + m_space_dec.group(2)
+
+    v = v.replace(" ", "")
+
     # Détecter le séparateur décimal
     if "," in v and "." in v:
         if v.rfind(",") > v.rfind("."):
-            # format FR : 1.234,56
-            v = v.replace(".", "").replace(",", ".")
+            v = v.replace(".", "").replace(",", ".")  # FR: 1.234,56
         else:
-            # format EN : 1,234.56
-            v = v.replace(",", "")
+            v = v.replace(",", "")  # EN: 1,234.56
     elif "," in v:
-        # virgule = décimale (FR/IT/DE/ES) ou milliers (EN) — on regarde les décimales
         parts = v.split(",")
-        if len(parts[-1]) == 2:
-            v = v.replace(".", "").replace(",", ".")
+        if len(parts[-1]) == 2 and len(parts) <= 2:
+            v = v.replace(".", "").replace(",", ".")  # FR: 242,04
         else:
-            v = v.replace(",", "")
-    else:
-        v = v.replace(".", "") if v.count(".") > 1 else v
+            v = v.replace(",", "")  # EN: 1,234
+    elif "." in v:
+        parts = v.split(".")
+        if len(parts[-1]) == 2 and len(parts) <= 2:
+            pass  # déjà bon: 242.04
+        elif len(parts) > 2:
+            v = v.replace(".", "")  # 1.234.56 -> 123456 (rare, on garde tel quel)
     try:
-        return float(v)
+        result = float(v)
+        # Sanity check: un montant de facture est entre 0.01 et 999999.99
+        if 0.01 <= result <= 999999.99:
+            return result
+        return None
     except ValueError:
         return None
 
@@ -298,7 +336,8 @@ class ExtractionService:
             for pat in DATE_PATTERNS:
                 for m in re.finditer(pat, line, re.IGNORECASE):
                     groups = m.groups()
-                    if len(groups) == 3 and all(g.isdigit() for g in groups):
+                    if len(groups) == 3 and all(g.strip().isdigit() for g in groups):
+                        groups = tuple(g.strip() for g in groups)
                         a, b, c = int(groups[0]), int(groups[1]), int(groups[2])
                         # ISO : année en premier
                         if a > 31:
@@ -477,14 +516,97 @@ class ExtractionService:
         from collections import Counter
         return Counter(candidates).most_common(1)[0][0]
 
+    # Caractères souvent confondus par l'OCR avec €/£/$ (faux positifs monétaires)
+    CURRENCY_LOOKALIKES = {
+        "幥": "€",   # U+5E5E (chinois) confondu avec €
+        "E": "€",    # E majuscule isolé après un nombre
+        "EUR": "€",
+        "eur": "€",
+        "£": "£",
+        "L": "£",
+        "$": "$",
+        "S": "$",
+        "USD": "$",
+        "GBP": "£",
+        "CHF": "CHF",
+        "Fr": "CHF",
+    }
+
+    @staticmethod
+    def _normalize_currency_chars(text: str) -> str:
+        """Remplace les caractères ressemblant à des symboles monétaires par les vrais symboles."""
+        # 幥 (U+5E5E) -> €
+        text = text.replace("幥", "€")
+        # Autres caractères chinois confondus avec € par l'OCR
+        text = text.replace("日", "€")  # 日 (U+65E5, "jour/soleil")
+        text = text.replace("目", "€")  # 目 (U+76EE)
+        # Nettoyer les artefacts: nombre幥chiffre -> nombre,XX €
+        import re as _re
+        def fix_artifact(m):
+            num = m.group(1)
+            if len(num) >= 4 and "," not in num and "." not in num:
+                return num[:-2] + "," + num[-2:] + " €"
+            return num + " €"
+        text = _re.sub(r"(\d{3,})€\d", fix_artifact, text)
+        text = _re.sub(r"([\d,\.]+)€\d", r"\1 €", text)
+        return text
+
     def _extract_amounts(self, text: str) -> dict:
         out: dict = {"currency": "EUR"}
+        # Normaliser les caractères monétaires faux (幥 -> €, etc.)
+        text = self._normalize_currency_chars(text)
+        # Extraire le taux de TVA depuis le texte original (avant preprocessing)
+        vat_rate = None
+        for pat in [
+            r"(?:tva|vat|iva|mwst|btw)\s*(?:\u00e0|a|@|de)?\s*(\d{1,2}(?:[,\.]\d{1,2})?)\s*%",
+        ]:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                vat_rate = float(m.group(1).replace(",", "."))
+                break
         # Prétraitement global : nettoyer les artefacts OCR
-        # "628,91€5" -> "628,91 €", "201,70€5" -> "201,70 €", "350.64GBP" -> "350.64 GBP"
-        t = re.sub(r"([\d,\.]+)\s*(GBP|EUR|USD|CHF|€|£|\$)\s*\d+", r"\1 \2", text)
-        t = re.sub(r"([\d,\.]+)(€|£|\$)", r"\1 \2", t)
-        t = re.sub(r"(GBP|EUR|USD|CHF)\s*([\d,\.]+)", r"\2 \1", t)
+        # Patterns à corriger:
+        #   "628,91€5" / "201,70€5" -> "201,70 €" (le € remplace le séparateur décimal + chiffre parasite)
+        #   "24204" (virgule perdue) -> on ne peut rien faire ici, géré par le contexte
+        #   "242 04 €" -> "242.04 €"
+        #   "350.64GBP" -> "350.64 GBP"
+        import re as _re
+        t = text
+        # "201,70€5" ou "20170€5" -> détecter: (chiffres)(€)(1 chiffre parasite)
+        # Si avant € on a un nombre SANS séparateur décimal et 5+ chiffres, c'est probablement XX,YY€Z
+        def fix_euro_artifact(m):
+            num = m.group(1)
+            # Si le nombre a 5+ chiffres sans séparateur, insérer une virgule avant les 2 derniers
+            if len(num) >= 4 and "," not in num and "." not in num:
+                return num[:-2] + "," + num[-2:] + " €"
+            return num + " €"
+        t = _re.sub(r"(\d{3,})€\d", fix_euro_artifact, t)
+        t = _re.sub(r"(\d[\d,\. ]*\d)€\d", fix_euro_artifact, t)
+        # "628,91€5" -> "628,91 €"
+        t = _re.sub(r"([\d,\.]+)€\d", r"\1 €", t)
+        # "201,70€5" déjà géré ci-dessus, mais au cas où:
+        t = _re.sub(r"([\d,\.]+)\s*€\s*\d+", r"\1 €", t)
+        # "20170€" (nombre 4+ chiffres collé au €, sans séparateur ni chiffre après) -> "201,70 €"
+        def fix_bare_euro(m):
+            num = m.group(1)
+            if len(num) >= 4 and "," not in num and "." not in num:
+                return num[:-2] + "," + num[-2:] + " €"
+            return num + " €"
+        t = _re.sub(r"(\d{4,})€(?!\d)", fix_bare_euro, t)
+        # Nettoyer les espaces parasites
+        t = _re.sub(r"(\d)\s+(\d{2})\s*€", r"\1,\2 €", t)  # "242 04 €" -> "242,04 €"
+        t = _re.sub(r"(\d)\s+(\d{2})$", r"\1,\2", t, flags=_re.MULTILINE)  # "242 04" fin de ligne
+        # "350.64GBP" -> "350.64 GBP"
+        t = _re.sub(r"([\d,\.]+)\s*(GBP|EUR|USD|CHF|£|\$)", r"\1 \2", t)
+        t = _re.sub(r"(GBP|EUR|USD|CHF)\s*([\d,\.]+)", r"\2 \1", t)
+        # "242 04" (sans €) en fin de ligne de total -> "242,04"
+        t = _re.sub(r"(\d{1,6})\s+(\d{2})(?![\d,.])", r"\1,\2", t)
+        # "5 15.50€" -> "515.50€" (espace parasite OCR entre chiffres avec décimale)
+        t = _re.sub(r"(\d{1,3})\s+(\d{3}(?:[,\.]\d{2})?\s*(?:€|EUR|GBP|\u00a3|\$|CHF))", r"\1\2", t)
+        t = _re.sub(r"(\d{1,3})\s+(\d{2}(?:[,\.]\d{2})?\s*(?:€|EUR|GBP|\u00a3|\$|CHF))", r"\1\2", t)
 
+        # Supprimer les lignes de TVA pour \u00e9viter de confondre le taux avec un montant
+        t = _re.sub(r"(?im)^.*(?:tva|vat|iva|mwst|btw)\s*(?:\u00e0|a|@|de)?\s*\d{1,2}(?:[,\.]\d{1,2})?\s*%.*$", "", t)
         # Devise
         if re.search(r"£|GBP|pound", t, re.IGNORECASE):
             out["currency"] = "GBP"
@@ -494,20 +616,41 @@ class ExtractionService:
             out["currency"] = "USD"
 
         # Labels TTC — ancrés en fin de ligne pour éviter les faux positifs
+        # \s* au lieu de \s+ pour accepter "TOTALTTC" (OCR sans espace)
         ttc_labels = [
             r"^\s*total\s*(?:ttc|toutes taxes|all\s*inclusive|inclus|iva inclusa|incl\.?\s*iva|"
             r"incl\s*mwst|incl\s*btw|inkl\s*mwst|general|grand total)\s*[:\-]?\s*$",
             r"^\s*(?:montant|amount|total|balance|importo|gesamtbetrag|totaal|total)\s*"
             r"(?:ttc|due|general|a\s*pagar|pagar|documento|te\s*betalen|betrag|fatura)?\s*[:\-]?\s*$",
             r"^\s*totale\s+documento\s*[:\-]?\s*$",
+            # OCR: "TOTALTTC" sans espace, "TOT TTC"
+            r"^\s*tot(?:al)?\s*ttc\s*[:\-]?\s*$",
+            r"^\s*total\s*ttc\s*[:\-]?\s*$",
+            # IT: "IMPORTO TOTALE" / "AMMONTARE TOTALE"
+            r"^\s*(?:importo|ammontare)\s+totale\s*[:\-]?\s*$",
+            # EN: "GRAND TOTAL" / "TOTAL DUE" / "AMOUNT DUE"
+            r"^\s*(?:grand\s+total|total\s+due|amount\s+due)\s*[:\-]?\s*$",
+            # Montant sur la m\u00eame ligne: "TOTAL TTC :    242,04 \u20ac"
+            r"^\s*total\s*(?:ttc|toutes taxes|inclus|iva inclusa|incl\.?\s*iva|general|grand total)\s*[:\-]",
+            r"^\s*total\s*(?:ttc|toutes taxes|inclus|iva inclusa|incl\.?\s*iva|general|grand total)\s*[:\-]?\s+\d",
+            r"^\s*(?:montant|amount|importo|gesamtbetrag|totaal)\s*(?:ttc|due|documento|betrag)?\s*[:\-]",
+            r"^\s*totale\s+documento\s*[:\-]",
+            r"^\s*total\s*[:\-]\s*\d",
         ]
-        # Labels HT
+        # Labels HT — accepter "Total HI" (OCR confond T et I)
         ht_labels = [
-            r"^\s*total\s*(?:ht|hors taxes|hors taxe)\s*[:\-]\s*$",
+            r"^\s*total\s*(?:h[it]|hors taxes|hors taxe)\s*[:\-]?\s*$",
             r"total\s*(?:net|netto|imponibile|iva esclusa)\s*[:\-]?\s*$",
             r"^\s*subtotal\s*[:\-]?\s*$",
-            r"^\s*totale\s+imponibile\s*[:\-]?\s*$",
+            r"^\s*totale\s*imponibile\s*[:\-]?\s*$",
             r"^\s*sub\s*total\s*[:\-]?\s*$",
+            r"^\s*tot(?:ale|al)?\s*h[it]\s*[:\-]?\s*$",
+            # Montant sur la m\u00eame ligne: "Total HT :    201,70 \u20ac"
+            r"^\s*total\s*(?:h[it]|hors taxes|hors taxe)\s*[:\-]",
+            r"^\s*total\s*(?:h[it]|hors taxes|hors taxe)\s*[:\-]?\s+\d",
+            r"^\s*totale\s*imponibile\s*[:\-]",
+            r"^\s*subtotal\s*[:\-]",
+            r"^\s*sub\s*total\s*[:\-]",
         ]
         vat_labels = [
             r"(?:tva|vat|iva|mwst|btw)\s*(?:à|a|@|de)?\s*(\d{1,2}(?:[,\.]\d{1,2})?)\s*%",
@@ -517,28 +660,52 @@ class ExtractionService:
             for label in labels:
                 for m in re.finditer(label, t, re.IGNORECASE | re.MULTILINE):
                     snippet = t[m.end(): m.end() + 60]
-                    for mp in MONEY_PATTERNS:
-                        mm = re.search(mp, snippet)
-                        if mm:
-                            val = _parse_money(mm.group(1))
+                    # Chercher ligne par ligne pour trouver le PREMIER montant
+                    # (évite de sauter au 2e montant si le 1er n'a pas de symbole €)
+                    for line in snippet.splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        # Ignorer les lignes qui sont des labels (pas de montant)
+                        if re.match(r"^[\D]*$", line):
+                            continue
+                        for mp in MONEY_PATTERNS:
+                            mm = re.search(mp, line)
+                            if mm:
+                                val = _parse_money(mm.group(1))
+                                if val and val > 0:
+                                    return val
+                        # Heuristique OCR: nombre de 5+ chiffres sans séparateur décimal
+                        # (ex: "24204" lu pour "242,04") -> insère une virgule avant les 2 derniers chiffres.
+                        bare = re.match(r"^(\d{5,})(?!\d)", line)
+                        if bare:
+                            num = bare.group(1)
+                            candidate = float(num[:-2] + "." + num[-2:])
+                            if 1 <= candidate <= 999999:
+                                return candidate
+                        nm = re.search(r"(\d{1,3}(?:[ \u00a0.]\d{3})*(?:[,\.]\d{2})|\d+(?:[,\.]\d{2})?)", line)
+                        if nm:
+                            val = _parse_money(nm.group(1))
                             if val and val > 0:
                                 return val
-                    nm = re.search(r"(\d{1,3}(?:[ \u00a0.]\d{3})*(?:[,\.]\d{2})|\d+(?:[,\.]\d{2})?)", snippet)
-                    if nm:
-                        val = _parse_money(nm.group(1))
-                        if val and val > 0:
-                            return val
+                        # Ligne avec un nombre mais pas de décimales: continuer si c'est un label
+                        if re.search(r"total|ttc|ht|tva|vat|iva|subtotal|imponibile|documento|amount|due", line, re.IGNORECASE):
+                            continue
+                        # Si la ligne contient un nombre isolé, c'est probablement le montant
+                        isolated = re.match(r"^[\s\d,\.]+$", line)
+                        if isolated:
+                            nums = re.findall(r"\d[\d,\.]*", line)
+                            for n in nums:
+                                val = _parse_money(n)
+                                if val and val > 0:
+                                    return val
             return None
 
         ttc = find_amount_after_label(ttc_labels)
         ht = find_amount_after_label(ht_labels)
 
-        vat_rate = None
-        for pat in vat_labels:
-            m = re.search(pat, t, re.IGNORECASE)
-            if m:
-                vat_rate = float(m.group(1).replace(",", "."))
-                break
+        # Extraire le taux de TVA AVANT de supprimer les lignes TVA
+        # vat_rate déjà extrait ci-dessus depuis le texte original
 
         out["ttc"] = ttc
         out["ht"] = ht
