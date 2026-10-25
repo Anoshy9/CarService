@@ -1,9 +1,9 @@
-# 🚗 Carnet d'Entretien Automobile
+# 🚗 CarService — Carnet d'Entretien Automobile
 ## Citroën C2 · 1.4 HDi 70 cv (DV4TD) · 2009
 
-> Application professionnelle de suivi d'entretien automobile avec **OCR multilingue**,
-> gestion des factures et contrôles techniques internationaux, planification des révisions
-> selon les préconisations constructeur, et export du carnet d'entretien complet.
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=Anoshy9/CarService)
+
+> **🚀 Lancer l'application en 1 clic :** [Ouvrir dans GitHub Codespaces](https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=Anoshy9/CarService) → attendre 2 min → taper `./run.sh` → cliquer sur le lien du port 8000
 
 ---
 
