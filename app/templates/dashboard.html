@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>📊 Tableau de bord</h2>{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon blue">🛣️</div>
+        <div class="stat-info">
+            <h4 id="stat-km">—</h4>
+            <p>Kilométrage actuel</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon cyan">📄</div>
+        <div class="stat-info">
+            <h4 id="stat-docs">—</h4>
+            <p>Documents</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green">🔧</div>
+        <div class="stat-info">
+            <h4 id="stat-ops">—</h4>
+            <p>Opérations</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">💶</div>
+        <div class="stat-info">
+            <h4 id="stat-spent">—</h4>
+            <p>Total dépensé</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue">📈</div>
+        <div class="stat-info">
+            <h4 id="stat-km-year">—</h4>
+            <p>Km / an (estimé)</p>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon red">⚠️</div>
+        <div class="stat-info">
+            <h4 id="stat-alerts">—</h4>
+            <p>Alertes actives</p>
+        </div>
+    </div>
+</div>
+
+<div class="grid-2">
+    <!-- En retard -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>🔴 En retard</h3>
+                <p class="card-subtitle">Interventions dépassées</p>
+            </div>
+        </div>
+        <div id="overdue-list" class="schedule-list">
+            <p class="text-muted">Chargement…</p>
+        </div>
+    </div>
+
+    <!-- À venir -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>🟡 À venir</h3>
+                <p class="card-subtitle">Prochaines échéances (60 jours / 3000 km)</p>
+            </div>
+        </div>
+        <div id="upcoming-list" class="schedule-list">
+            <p class="text-muted">Chargement…</p>
+        </div>
+    </div>
+</div>
+
+<!-- Dernier CT -->
+<div class="card mt-3">
+    <div class="card-header">
+        <div>
+            <h3>🔍 Contrôle technique</h3>
+            <p class="card-subtitle">Dernier CT et prochaine échéance</p>
+        </div>
+    </div>
+    <div id="ct-info"><p class="text-muted">Chargement…</p></div>
+</div>
+
+<!-- Alertes récentes -->
+<div class="card mt-3">
+    <div class="card-header">
+        <div>
+            <h3>🔔 Alertes actives</h3>
+            <p class="card-subtitle">Cliquez sur la cloche en haut pour tout voir</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="refreshAlerts()">🔄 Rafraîchir</button>
+    </div>
+    <div id="recent-alerts"><p class="text-muted">Chargement…</p></div>
+</div>
+
+<!-- Raccourcis -->
+<div class="card mt-3">
+    <div class="card-header"><h3>⚡ Actions rapides</h3></div>
+    <div class="flex gap-2" style="flex-wrap: wrap;">
+        <a href="/upload" class="btn btn-primary">📤 Ajouter une facture / un CT</a>
+        <a href="/mileage" class="btn btn-secondary">🛣️ Saisir un kilométrage</a>
+        <a href="/schedule" class="btn btn-secondary">📅 Voir le planning complet</a>
+        <a href="/export" class="btn btn-secondary">📥 Exporter le carnet</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadDashboard() {
+    try {
+        const data = await apiGet('/dashboard');
+
+        // Stats
+        document.getElementById('stat-km').textContent = formatKm(data.current_mileage);
+        document.getElementById('stat-docs').textContent = data.stats.documents_count;
+        document.getElementById('stat-ops').textContent = data.stats.operations_count;
+        document.getElementById('stat-spent').textContent = formatMoney(data.stats.total_spent);
+        document.getElementById('stat-km-year').textContent = data.km_per_year_estimate ? formatKm(data.km_per_year_estimate) + '/an' : '—';
+        document.getElementById('stat-alerts').textContent = data.alerts.length;
+
+        // En retard
+        const overdueEl = document.getElementById('overdue-list');
+        if (data.overdue.length === 0) {
+            overdueEl.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><h3>Aucun retard</h3><p>Toutes les échéances sont respectées.</p></div>';
+        } else {
+            overdueEl.innerHTML = data.overdue.map(item => scheduleCard(item, true)).join('');
+        }
+
+        // À venir
+        const upcomingEl = document.getElementById('upcoming-list');
+        if (data.upcoming.length === 0) {
+            upcomingEl.innerHTML = '<div class="empty-state"><div class="empty-icon">📅</div><h3>Rien à venir</h3><p>Aucune échéance dans les 60 prochains jours.</p></div>';
+        } else {
+            upcomingEl.innerHTML = data.upcoming.map(item => scheduleCard(item, false)).join('');
+        }
+
+        // CT
+        const ctEl = document.getElementById('ct-info');
+        if (data.last_ct) {
+            const nextDue = data.last_ct.next_due;
+            const daysLeft = nextDue ? Math.round((new Date(nextDue) - new Date()) / 86400000) : null;
+            ctEl.innerHTML = `
+                <div class="flex gap-2" style="flex-wrap:wrap; align-items:center;">
+                    <div>
+                        <strong>Dernier CT :</strong> ${formatDate(data.last_ct.date)}
+                        ${data.last_ct.result ? `<span class="badge badge-${data.last_ct.result === 'favorable' ? 'success' : 'warning'}">${data.last_ct.result}</span>` : ''}
+                    </div>
+                    <div>
+                        <strong>Prochain CT :</strong> ${formatDate(nextDue)}
+                        ${daysLeft !== null ? `<span class="badge ${daysLeft < 0 ? 'badge-critical' : daysLeft < 60 ? 'badge-warning' : 'badge-success'}">${daysLeft < 0 ? 'En retard de ' + (-daysLeft) + ' j' : daysLeft + ' j restants'}</span>` : ''}
+                    </div>
+                    ${data.last_ct.garage ? `<div><strong>Centre :</strong> ${escapeHtml(data.last_ct.garage)}</div>` : ''}
+                </div>
+            `;
+        } else {
+            ctEl.innerHTML = '<p class="text-warning">⚠️ Aucun contrôle technique enregistré. Pensez à ajouter vos rapports de CT.</p>';
+        }
+
+        // Alertes récentes
+        const alertsEl = document.getElementById('recent-alerts');
+        if (data.alerts.length === 0) {
+            alertsEl.innerHTML = '<p class="text-success">✅ Aucune alerte active.</p>';
+        } else {
+            alertsEl.innerHTML = data.alerts.slice(0, 5).map(a => `
+                <div class="alert-item severity-${a.severity}">
+                    <h5>${escapeHtml(a.title)}</h5>
+                    <p>${escapeHtml(a.message)}</p>
+                </div>
+            `).join('');
+        }
+    } catch (e) {
+        showToast('Erreur de chargement du tableau de bord', 'error');
+        console.error(e);
+    }
+}
+
+function scheduleCard(item, isOverdue) {
+    const critical = item.is_critical ? 'status-critical' : (isOverdue ? 'status-overdue' : 'status-soon');
+    const daysTxt = item.days_left !== null ? (item.days_left < 0 ? `Dépassé de ${-item.days_left} j` : `Dans ${item.days_left} j`) : '—';
+    const kmTxt = item.km_left !== null ? `${formatKm(item.km_left)} restants` : '—';
+    return `
+        <div class="schedule-item ${critical}" onclick="location.href='/schedule'" style="cursor:pointer;">
+            <div class="schedule-item-icon">${item.is_critical ? '🔴' : '🔧'}</div>
+            <div class="schedule-item-body">
+                <h4>${escapeHtml(item.title)} ${item.is_critical ? '<span class="badge badge-critical">CRITIQUE</span>' : ''}</h4>
+                <p>${escapeHtml((item.description || '').substring(0, 120))}${(item.description || '').length > 120 ? '…' : ''}</p>
+                <div class="schedule-item-meta">
+                    <span>📅 ${formatDate(item.next_due_date)} (${daysTxt})</span>
+                    <span>🛣️ ${item.next_due_mileage ? formatKm(item.next_due_mileage) + ' (' + kmTxt + ')' : '—'}</span>
+                    ${item.last_done_at ? `<span>Dernier : ${formatDate(item.last_done_at)}</span>` : ''}
+                </div>
+            </div>
+            ${statusBadge(item.status)}
+        </div>
+    `;
+}
+
+async function refreshAlerts() {
+    try {
+        await apiPost('/alerts/refresh', {});
+        showToast('Alertes recalculées', 'success');
+        loadDashboard();
+        loadAlertBadge();
+    } catch (e) { showToast('Erreur', 'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

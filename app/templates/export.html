@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Exporter le carnet — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>📥 Exporter le carnet d'entretien</h2>{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>📥 Carnet d'entretien complet</h3>
+                <p class="card-subtitle">Export JSON structuré de tout votre historique</p>
+            </div>
+        </div>
+        <p class="text-sm text-muted mb-2">
+            Le carnet d'entretien exporté contient :
+        </p>
+        <ul class="text-sm mb-3" style="padding-left:20px; color:var(--text-secondary);">
+            <li>🚗 Les informations complètes du véhicule (VIN, immatriculation, kilométrage)</li>
+            <li>📋 Le plan d'entretien constructeur avec les prochaines échéances</li>
+            <li>📄 Tous les documents (factures, CT) avec métadonnées extraites par OCR</li>
+            <li>🔧 L'historique complet des interventions (dates, kilométrages, coûts, garages, pays)</li>
+            <li>🛣️ L'historique des relevés de kilométrage</li>
+            <li>🔔 Les alertes actives</li>
+            <li>📊 Les statistiques (total dépensé, répartition par pays…)</li>
+        </ul>
+        <p class="text-sm text-muted mb-2">
+            💡 Ce fichier peut servir de <strong>preuve d'entretien</strong> lors de la revente du véhicule,
+            ou être transmis à un professionnel. Conservez-le précieusement.
+        </p>
+        <a href="/api/export/carnet-entretien" class="btn btn-primary btn-lg" download>📥 Télécharger le carnet complet (JSON)</a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>👁️ Aperçu</h3>
+                <p class="card-subtitle">Résumé de ce qui sera exporté</p>
+            </div>
+        </div>
+        <div id="preview-box"><p class="text-muted">Chargement…</p></div>
+    </div>
+</div>
+
+<!-- Récapitulatif véhicule -->
+<div class="card mt-3" id="vehicle-summary">
+    <div class="card-header"><h3>🚗 Récapitulatif véhicule</h3></div>
+    <div id="vehicle-summary-body"><p class="text-muted">Chargement…</p></div>
+</div>
+
+<!-- Conseils -->
+<div class="card mt-3">
+    <div class="card-header"><h3>💡 Conseils pour un carnet d'entretien professionnel</h3></div>
+    <div class="grid-3 text-sm" style="color:var(--text-secondary);">
+        <div>
+            <h4 style="color:var(--text-primary); margin-bottom:8px;">📸 Photographiez bien</h4>
+            <p>Pour un OCR optimal : bonne luminosité, document bien à plat, photo nette (pas floue), cadrage complet de la facture.</p>
+        </div>
+        <div>
+            <h4 style="color:var(--text-primary); margin-bottom:8px;">🌍 Toutes les langues</h4>
+            <p>Vos factures d'Italie, d'Angleterre ou d'ailleurs sont reconnues automatiquement. Vérifiez toujours le pays extrait.</p>
+        </div>
+        <div>
+            <h4 style="color:var(--text-primary); margin-bottom:8px;">⚠️ Zones illisibles</h4>
+            <p>Quand l'OCR signale une zone illisible, relisez le document original et corrigez les champs manuellement.</p>
+        </div>
+        <div>
+            <h4 style="color:var(--text-primary); margin-bottom:8px;">🔴 Courroie de distribution</h4>
+            <p>Sur le 1.4 HDi, la courroie de distribution est vitale. Remplacez-la tous les 240 000 km ou 10 ans, impérativement.</p>
+        </div>
+        <div>
+            <h4 style="color:var(--text-primary); margin-bottom:8px;">🔍 Contrôle technique</h4>
+            <p>1er CT à 4 ans, puis tous les 2 ans. Scannez vos rapports de CT, ils alimentent automatiquement le planning.</p>
+        </div>
+        <div>
+            <h4 style="color:var(--text-primary); margin-bottom:8px;">💾 Sauvegarde</h4>
+            <p>Exportez régulièrement votre carnet et sauvegardez le dossier <code>data/</code> (base + documents originaux).</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadPreview() {
+    try {
+        const data = await apiGet('/export/carnet-entretien/preview');
+        const v = data.vehicle;
+        const s = data.stats;
+
+        document.getElementById('preview-box').innerHTML = `
+            <ul class="info-list">
+                <li><span class="label">Véhicule</span><span class="value">${escapeHtml(v.brand)} ${escapeHtml(v.model)} ${v.year}</span></li>
+                <li><span class="label">Moteur</span><span class="value">${escapeHtml(v.engine)}</span></li>
+                <li><span class="label">Kilométrage</span><span class="value">${formatKm(data.current_mileage)}</span></li>
+                <li><span class="label">Km/an estimés</span><span class="value">${data.km_per_year_estimate ? formatKm(data.km_per_year_estimate) : '—'}</span></li>
+                <li><span class="label">Documents</span><span class="value">${s.documents_count}</span></li>
+                <li><span class="label">Opérations</span><span class="value">${s.operations_count}</span></li>
+                <li><span class="label">Relevés km</span><span class="value">${s.mileage_records_count}</span></li>
+                <li><span class="label">Total dépensé</span><span class="value"><strong>${formatMoney(s.total_spent)}</strong></span></li>
+                <li><span class="label">Zones illisibles</span><span class="value">${s.documents_with_unreadable_zones} document(s)</span></li>
+                <li><span class="label">Alertes actives</span><span class="value">${data.alerts.length}</span></li>
+                <li><span class="label">Postes au planning</span><span class="value">${data.overdue.length + data.upcoming.length + data.ok.length}</span></li>
+                <li><span class="label">En retard</span><span class="value text-danger">${data.overdue.length}</span></li>
+                <li><span class="label">À venir</span><span class="value text-warning">${data.upcoming.length}</span></li>
+            </ul>
+        `;
+
+        document.getElementById('vehicle-summary-body').innerHTML = `
+            <div class="grid-3">
+                <div>
+                    <h4 style="margin-bottom:8px;">Identité</h4>
+                    <ul class="info-list">
+                        <li><span class="label">Marque / Modèle</span><span class="value">${escapeHtml(v.brand)} ${escapeHtml(v.model)}</span></li>
+                        <li><span class="label">Année</span><span class="value">${v.year}</span></li>
+                        <li><span class="label">Moteur</span><span class="value">${escapeHtml(v.engine)}</span></li>
+                        <li><span class="label">Carburant</span><span class="value">${escapeHtml(v.fuel)}</span></li>
+                        <li><span class="label">VIN</span><span class="value">${escapeHtml(v.vin || 'Non renseigné')}</span></li>
+                        <li><span class="label">Immatriculation</span><span class="value">${escapeHtml(v.plate || 'Non renseignée')}</span></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="margin-bottom:8px;">Échéances clés</h4>
+                    <ul class="info-list">
+                        ${data.overdue.slice(0, 5).map(o => `<li><span class="label">🔴 ${escapeHtml(o.title)}</span><span class="value">${formatDate(o.next_due_date)}</span></li>`).join('')}
+                        ${data.upcoming.slice(0, 5).map(o => `<li><span class="label">🟡 ${escapeHtml(o.title)}</span><span class="value">${formatDate(o.next_due_date)}</span></li>`).join('')}
+                        ${!data.overdue.length && !data.upcoming.length ? '<li><span class="text-success">✅ Tout est à jour</span></li>' : ''}
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="margin-bottom:8px;">Dernier CT</h4>
+                    ${data.last_ct ? `
+                        <ul class="info-list">
+                            <li><span class="label">Date</span><span class="value">${formatDate(data.last_ct.date)}</span></li>
+                            <li><span class="label">Résultat</span><span class="value">${escapeHtml(data.last_ct.result || '—')}</span></li>
+                            <li><span class="label">Centre</span><span class="value">${escapeHtml(data.last_ct.garage || '—')}</span></li>
+                            <li><span class="label">Prochain CT</span><span class="value"><strong>${formatDate(data.last_ct.next_due)}</strong></span></li>
+                        </ul>
+                    ` : '<p class="text-warning text-sm">⚠️ Aucun CT enregistré</p>'}
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        document.getElementById('preview-box').innerHTML = '<p class="text-danger">Erreur de chargement</p>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadPreview);
+</script>
+{% endblock %}

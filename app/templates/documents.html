@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Mes documents — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>📄 Mes documents</h2>{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3>Historique des documents</h3>
+            <p class="card-subtitle">Factures, contrôles techniques, devis — tous pays confondus</p>
+        </div>
+        <a href="/upload" class="btn btn-primary">📤 Ajouter</a>
+    </div>
+
+    <div class="filter-bar">
+        <select class="form-control" id="filter-type" onchange="loadDocuments()">
+            <option value="">Tous les types</option>
+            <option value="facture">🧾 Factures</option>
+            <option value="controle_technique">🔍 Contrôles techniques</option>
+            <option value="devis">📋 Devis</option>
+            <option value="recu">🧾 Reçus</option>
+            <option value="autre">📄 Autres</option>
+        </select>
+        <select class="form-control" id="filter-country" onchange="loadDocuments()">
+            <option value="">Tous les pays</option>
+            <option value="France">🇫🇷 France</option>
+            <option value="Italie">🇮🇹 Italie</option>
+            <option value="Royaume-Uni">🇬🇧 Royaume-Uni</option>
+            <option value="Allemagne">🇩🇪 Allemagne</option>
+            <option value="Espagne">🇪🇸 Espagne</option>
+            <option value="Belgique">🇧🇪 Belgique</option>
+            <option value="Pays-Bas">🇳🇱 Pays-Bas</option>
+            <option value="Suisse">🇨🇭 Suisse</option>
+            <option value="Portugal">🇵🇹 Portugal</option>
+        </select>
+        <input type="text" class="form-control" id="filter-search" placeholder="🔍 Rechercher (garage, n°…)" oninput="loadDocuments()" style="min-width:220px;">
+    </div>
+
+    <div class="docs-grid" id="docs-grid">
+        <p class="text-muted">Chargement…</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allDocs = [];
+
+async function loadDocuments() {
+    const grid = document.getElementById('docs-grid');
+    grid.innerHTML = '<p class="text-muted">Chargement…</p>';
+    try {
+        const type = document.getElementById('filter-type').value;
+        const country = document.getElementById('filter-country').value;
+        let url = '/documents?';
+        if (type) url += `doc_type=${type}&`;
+        if (country) url += `country=${encodeURIComponent(country)}&`;
+        allDocs = await apiGet(url);
+        renderDocs();
+    } catch (e) {
+        grid.innerHTML = '<p class="text-danger">Erreur de chargement</p>';
+    }
+}
+
+function renderDocs() {
+    const grid = document.getElementById('docs-grid');
+    const search = document.getElementById('filter-search').value.toLowerCase();
+    const docs = allDocs.filter(d => {
+        if (!search) return true;
+        return (d.garage_name || '').toLowerCase().includes(search)
+            || (d.document_number || '').toLowerCase().includes(search)
+            || (d.original_filename || '').toLowerCase().includes(search);
+    });
+
+    if (!docs.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">
+            <div class="empty-icon">📭</div><h3>Aucun document</h3>
+            <p><a href="/upload" class="btn btn-primary mt-2">📤 Ajouter votre premier document</a></p>
+        </div>`;
+        return;
+    }
+
+    grid.innerHTML = docs.map(d => {
+        const icon = d.doc_type === 'controle_technique' ? '🔍' : (d.doc_type === 'devis' ? '📋' : '🧾');
+        const confPct = d.ocr_confidence !== null ? Math.round(d.ocr_confidence * 100) + '%' : '—';
+        return `
+            <div class="doc-card" onclick="location.href='/documents/${d.id}'">
+                <div class="doc-icon">${icon}</div>
+                <h4>${escapeHtml(d.original_filename)}</h4>
+                <div class="doc-meta">
+                    <span>${docTypeBadge(d.doc_type)}</span>
+                    <span>📅 ${formatDate(d.document_date)}</span>
+                    ${d.garage_country ? `<span>${countryFlag(d.garage_country)} ${escapeHtml(d.garage_country)}</span>` : ''}
+                    ${d.detected_language ? `<span>${langFlag(d.detected_language)} ${d.detected_language.toUpperCase()}</span>` : ''}
+                </div>
+                <div class="doc-meta">
+                    ${d.garage_name ? `<span>🏪 ${escapeHtml(d.garage_name)}</span>` : ''}
+                    ${d.mileage_at_service ? `<span>🛣️ ${formatKm(d.mileage_at_service)}</span>` : ''}
+                    ${d.total_ttc ? `<span>💶 ${formatMoney(d.total_ttc, d.currency)}</span>` : ''}
+                </div>
+                <div class="doc-meta">
+                    <span class="text-muted">OCR ${confPct}</span>
+                    ${d.unreadable_zones_count > 0 ? `<span class="badge badge-warning">⚠ ${d.unreadable_zones_count} zone(s) illisible(s)</span>` : '<span class="badge badge-success">✓ Lisible</span>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', loadDocuments);
+</script>
+{% endblock %}

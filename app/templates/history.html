@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Historique entretien — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>🔧 Historique d'entretien</h2>{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3>Toutes les interventions</h3>
+            <p class="card-subtitle">Chronologie complète — tous garages, tous pays</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('add-op-form').classList.toggle('hidden')">➕ Ajouter une intervention</button>
+    </div>
+
+    <!-- Formulaire d'ajout manuel -->
+    <div class="card hidden mb-2" id="add-op-form" style="background:var(--bg-tertiary);">
+        <h4 class="mb-2">➕ Saisir une intervention manuellement</h4>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Type</label>
+                <select class="form-control" id="op-type">
+                    <option value="vidange">Vidange</option>
+                    <option value="filtres">Filtres</option>
+                    <option value="distribution">Courroie de distribution</option>
+                    <option value="courroie_accessoires">Courroie d'accessoires</option>
+                    <option value="freins">Freins</option>
+                    <option value="pneumatiques">Pneumatiques</option>
+                    <option value="batterie">Batterie</option>
+                    <option value="liquide_refroidissement">Liquide de refroidissement</option>
+                    <option value="boite_vitesses">Boîte de vitesses</option>
+                    <option value="suspension">Suspension</option>
+                    <option value="echappement">Échappement</option>
+                    <option value="electricite">Électricité</option>
+                    <option value="carrosserie">Carrosserie</option>
+                    <option value="controle_technique">Contrôle technique</option>
+                    <option value="autre">Autre</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" class="form-control" id="op-date">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Titre / description</label>
+            <input type="text" class="form-control" id="op-title" placeholder="Ex : Vidange + filtres 30 000 km">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Kilométrage</label>
+                <input type="number" class="form-control" id="op-mileage" placeholder="Ex : 185000">
+            </div>
+            <div class="form-group">
+                <label>Coût total (€)</label>
+                <input type="number" step="0.01" class="form-control" id="op-cost" placeholder="Ex : 320.00">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Garage</label>
+                <input type="text" class="form-control" id="op-garage" placeholder="Nom du garage">
+            </div>
+            <div class="form-group">
+                <label>Pays</label>
+                <input type="text" class="form-control" id="op-country" placeholder="Ex : Italie">
+            </div>
+        </div>
+        <div class="form-group">
+            <label><input type="checkbox" id="op-is-ct"> C'est un contrôle technique</label>
+        </div>
+        <button class="btn btn-primary" onclick="addOperation()">💾 Enregistrer</button>
+    </div>
+
+    <div class="filter-bar">
+        <select class="form-control" id="filter-optype" onchange="loadOps()">
+            <option value="">Tous les types</option>
+            <option value="vidange">Vidange</option>
+            <option value="filtres">Filtres</option>
+            <option value="distribution">Distribution</option>
+            <option value="freins">Freins</option>
+            <option value="pneumatiques">Pneumatiques</option>
+            <option value="controle_technique">Contrôle technique</option>
+            <option value="autre">Autre</option>
+        </select>
+        <label class="text-sm text-muted"><input type="checkbox" id="filter-ct" onchange="loadOps()"> CT uniquement</label>
+    </div>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Date</th><th>Type</th><th>Titre</th><th>Garage</th>
+                    <th>Pays</th><th>Km</th><th>Coût</th><th>Doc</th>
+                </tr>
+            </thead>
+            <tbody id="ops-tbody">
+                <tr><td colspan="8" class="text-muted text-center">Chargement…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Stats par pays -->
+<div class="card mt-3">
+    <div class="card-header"><h3>🌍 Répartition géographique</h3></div>
+    <div id="country-stats"><p class="text-muted">Chargement…</p></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadOps() {
+    const tbody = document.getElementById('ops-tbody');
+    try {
+        const type = document.getElementById('filter-optype').value;
+        const ctOnly = document.getElementById('filter-ct').checked;
+        let url = '/operations?';
+        if (type) url += `op_type=${type}&`;
+        if (ctOnly) url += `is_ct=true&`;
+        const ops = await apiGet(url);
+        if (!ops.length) {
+            tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">🔧</div><h3>Aucune intervention</h3><p>Ajoutez vos factures ou saisissez des interventions manuellement.</p></div></td></tr>';
+            return;
+        }
+        tbody.innerHTML = ops.map(o => `
+            <tr class="${o.is_ct ? 'clickable' : ''}" ${o.document_id ? `onclick="location.href='/documents/${o.document_id}'"` : ''}>
+                <td class="text-mono">${formatDate(o.performed_at)}</td>
+                <td><span class="badge badge-info">${escapeHtml(o.op_type)}</span></td>
+                <td>
+                    ${escapeHtml(o.title)}
+                    ${o.is_ct ? `<br>${o.ct_result ? severityBadge(o.ct_result === 'favorable' ? 'info' : 'warning') : ''}` : ''}
+                </td>
+                <td>${escapeHtml(o.garage || '—')}</td>
+                <td>${o.country ? countryFlag(o.country) + ' ' + escapeHtml(o.country) : '—'}</td>
+                <td class="text-mono">${formatKm(o.mileage)}</td>
+                <td class="text-mono">${formatMoney(o.total_cost)}</td>
+                <td>${o.document_id ? `<a href="/documents/${o.document_id}" onclick="event.stopPropagation()">📄 #${o.document_id}</a>` : '—'}</td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-danger">Erreur de chargement</td></tr>';
+    }
+}
+
+async function loadCountryStats() {
+    try {
+        const stats = await apiGet('/stats');
+        const el = document.getElementById('country-stats');
+        const countries = stats.documents.by_country;
+        const entries = Object.entries(countries);
+        if (!entries.length) {
+            el.innerHTML = '<p class="text-muted">Aucune donnée géographique.</p>';
+            return;
+        }
+        el.innerHTML = `
+            <div class="table-container">
+                <table class="data-table">
+                    <thead><tr><th>Pays</th><th>Documents</th><th>Total dépensé</th></tr></thead>
+                    <tbody>
+                        ${entries.map(([c, v]) => `
+                            <tr>
+                                <td>${countryFlag(c)} ${escapeHtml(c)}</td>
+                                <td>${v.count}</td>
+                                <td class="text-mono">${formatMoney(v.total)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    } catch (e) { /* silencieux */ }
+}
+
+async function addOperation() {
+    const data = {
+        op_type: document.getElementById('op-type').value,
+        title: document.getElementById('op-title').value,
+        performed_at: document.getElementById('op-date').value,
+        mileage: parseInt(document.getElementById('op-mileage').value) || null,
+        total_cost: parseFloat(document.getElementById('op-cost').value) || null,
+        garage: document.getElementById('op-garage').value || null,
+        country: document.getElementById('op-country').value || null,
+        is_ct: document.getElementById('op-is-ct').checked,
+    };
+    if (!data.title || !data.performed_at) {
+        showToast('⚠️ Titre et date obligatoires', 'warning');
+        return;
+    }
+    try {
+        await apiPost('/operations', data);
+        showToast('✅ Intervention ajoutée', 'success');
+        document.getElementById('add-op-form').classList.add('hidden');
+        // reset
+        ['op-title','op-mileage','op-cost','op-garage','op-country'].forEach(id => document.getElementById(id).value = '');
+        loadOps();
+        loadSidebarVehicle();
+        loadAlertBadge();
+    } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('op-date').valueAsDate = new Date();
+    loadOps();
+    loadCountryStats();
+});
+</script>
+{% endblock %}

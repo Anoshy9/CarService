@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Document #{{ document_id }} — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>📄 Détail du document</h2>{% endblock %}
+
+{% block content %}
+<div id="detail-container"><p class="text-muted">Chargement…</p></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const docId = {{ document_id }};
+
+async function loadDetail() {
+    const container = document.getElementById('detail-container');
+    try {
+        const d = await apiGet(`/documents/${docId}`);
+        renderDetail(d);
+    } catch (e) {
+        container.innerHTML = '<p class="text-danger">Document introuvable.</p>';
+    }
+}
+
+function renderDetail(d) {
+    const container = document.getElementById('detail-container');
+    const confPct = d.ocr_confidence !== null ? Math.round(d.ocr_confidence * 100) + '%' : '—';
+
+    let unreadableHtml = '';
+    if (d.unreadable_zones && d.unreadable_zones.length) {
+        unreadableHtml = `
+            <div class="card mt-3">
+                <div class="card-header"><h3>⚠️ Zones illisibles (${d.unreadable_zones.length})</h3></div>
+                <p class="text-muted text-sm mb-2">Ces zones n'ont pas pu être lues avec certitude. Vérifiez le document original et corrigez les champs si besoin.</p>
+                ${d.unreadable_zones.map(z => `
+                    <div class="unreadable-zone">
+                        <strong>Page ${z.page}</strong> — confiance ${Math.round(z.confidence * 100)}%<br>
+                        <span class="text-mono text-sm">« ${escapeHtml(z.text_attempted)} »</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    const opsHtml = d.operations.length ? `
+        <div class="card mt-3">
+            <div class="card-header"><h3>🔧 Opérations détectées (${d.operations.length})</h3></div>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead><tr><th>Type</th><th>Titre</th><th>Date</th><th>Km</th><th>Coût</th></tr></thead>
+                    <tbody>
+                        ${d.operations.map(o => `
+                            <tr>
+                                <td>${escapeHtml(o.op_type)}</td>
+                                <td>${escapeHtml(o.title)}</td>
+                                <td>${formatDate(o.performed_at)}</td>
+                                <td class="text-mono">${formatKm(o.mileage)}</td>
+                                <td class="text-mono">${formatMoney(o.total_cost)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    ` : '';
+
+    const isPdf = d.original_filename.toLowerCase().endsWith('.pdf');
+    const fileUrl = `/api/documents/${d.id}/file`;
+
+    container.innerHTML = `
+        <div class="detail-grid">
+            <!-- Colonne gauche : infos -->
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <h3>${docTypeBadge(d.doc_type)}</h3>
+                            <p class="card-subtitle">${escapeHtml(d.original_filename)}</p>
+                        </div>
+                        <div class="flex gap-1">
+                            ${statusBadge(d.status === 'verifie' ? 'ok' : (d.unreadable_zones?.length ? 'soon' : 'ok'))}
+                        </div>
+                    </div>
+                    <ul class="info-list">
+                        <li><span class="label">Type</span><span class="value">${docTypeBadge(d.doc_type)}</span></li>
+                        <li><span class="label">Date du document</span><span class="value">${formatDate(d.document_date)}</span></li>
+                        <li><span class="label">N° de document</span><span class="value">${escapeHtml(d.document_number || '—')}</span></li>
+                        <li><span class="label">Garage / Centre</span><span class="value">${escapeHtml(d.garage_name || '—')}</span></li>
+                        <li><span class="label">Adresse</span><span class="value">${escapeHtml(d.garage_address || '—')}</span></li>
+                        <li><span class="label">Pays</span><span class="value">${d.garage_country ? countryFlag(d.garage_country) + ' ' + escapeHtml(d.garage_country) : '—'}</span></li>
+                        <li><span class="label">Téléphone</span><span class="value">${escapeHtml(d.garage_phone || '—')}</span></li>
+                        <li><span class="label">TVA / VAT</span><span class="value">${escapeHtml(d.garage_vat || '—')}</span></li>
+                        <li><span class="label">Kilométrage</span><span class="value">${formatKm(d.mileage_at_service)}</span></li>
+                        <li><span class="label">Total HT</span><span class="value">${formatMoney(d.total_ht, d.currency)}</span></li>
+                        <li><span class="label">Total TTC</span><span class="value"><strong>${formatMoney(d.total_ttc, d.currency)}</strong></span></li>
+                        <li><span class="label">Langue détectée</span><span class="value">${d.detected_language ? d.detected_language.toUpperCase() : '—'}</span></li>
+                        <li><span class="label">Confiance OCR</span><span class="value">${confPct}</span></li>
+                        <li><span class="label">Ajouté le</span><span class="value">${formatDate(d.uploaded_at)}</span></li>
+                    </ul>
+                    <div class="mt-2 flex gap-1" style="flex-wrap:wrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="toggleEdit()">✏️ Corriger</button>
+                        <button class="btn btn-secondary btn-sm" onclick="reprocess()">🔄 Retraiter l'OCR</button>
+                        <a href="${fileUrl}" target="_blank" class="btn btn-secondary btn-sm">📥 Télécharger</a>
+                        <button class="btn btn-danger btn-sm" onclick="deleteDoc()">🗑️ Supprimer</button>
+                    </div>
+                </div>
+
+                <!-- Formulaire d'édition -->
+                <div class="card mt-3 hidden" id="edit-form">
+                    <div class="card-header"><h3>✏️ Correction manuelle</h3></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" class="form-control" id="edit-date" value="${d.document_date || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>N° document</label>
+                            <input type="text" class="form-control" id="edit-number" value="${escapeHtml(d.document_number || '')}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Garage</label>
+                            <input type="text" class="form-control" id="edit-garage" value="${escapeHtml(d.garage_name || '')}">
+                        </div>
+                        <div class="form-group">
+                            <label>Pays</label>
+                            <input type="text" class="form-control" id="edit-country" value="${escapeHtml(d.garage_country || '')}">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Kilométrage</label>
+                            <input type="number" class="form-control" id="edit-mileage" value="${d.mileage_at_service || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Total TTC</label>
+                            <input type="number" step="0.01" class="form-control" id="edit-ttc" value="${d.total_ttc || ''}">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveEdit()">💾 Enregistrer et marquer comme vérifié</button>
+                </div>
+
+                <!-- Texte OCR brut -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3>📝 Texte extrait (OCR)</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="toggleOcr()">👁️ Afficher/Masquer</button>
+                    </div>
+                    <div id="ocr-box" class="hidden">
+                        <div class="ocr-text-box">${escapeHtml(d.ocr_raw_text || 'Aucun texte extrait.')}</div>
+                    </div>
+                </div>
+
+                ${unreadableHtml}
+                ${opsHtml}
+            </div>
+
+            <!-- Colonne droite : aperçu -->
+            <div>
+                <div class="card">
+                    <div class="card-header"><h3>👁️ Aperçu</h3></div>
+                    ${isPdf
+                        ? `<iframe class="doc-preview-frame" src="${fileUrl}"></iframe>`
+                        : `<img src="${fileUrl}" style="width:100%; border-radius:8px;" alt="Document">`}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function toggleEdit() {
+    document.getElementById('edit-form').classList.toggle('hidden');
+}
+
+function toggleOcr() {
+    document.getElementById('ocr-box').classList.toggle('hidden');
+}
+
+async function saveEdit() {
+    const fields = {
+        document_date: document.getElementById('edit-date').value || null,
+        document_number: document.getElementById('edit-number').value || null,
+        garage_name: document.getElementById('edit-garage').value || null,
+        garage_country: document.getElementById('edit-country').value || null,
+        mileage_at_service: parseInt(document.getElementById('edit-mileage').value) || null,
+        total_ttc: parseFloat(document.getElementById('edit-ttc').value) || null,
+    };
+    try {
+        await apiPut(`/documents/${docId}`, { fields });
+        showToast('✅ Document corrigé et vérifié', 'success');
+        loadDetail();
+    } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+}
+
+async function reprocess() {
+    showToast('🔄 Retraitement OCR en cours…', 'info');
+    try {
+        await apiPost(`/documents/${docId}/reprocess`, {});
+        showToast('✅ Document retraité', 'success');
+        loadDetail();
+    } catch (e) { showToast('Erreur', 'error'); }
+}
+
+async function deleteDoc() {
+    if (!confirm('Supprimer définitivement ce document ?')) return;
+    try {
+        await apiDelete(`/documents/${docId}`);
+        showToast('🗑️ Document supprimé', 'success');
+        setTimeout(() => location.href = '/documents', 1000);
+    } catch (e) { showToast('Erreur', 'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', loadDetail);
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Carnet d'Entretien — Citroën C2 1.4 HDi{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">🚗</div>
+                <div class="brand-text">
+                    <h1>Carnet d'Entretien</h1>
+                    <p>Citroën C2 · 1.4 HDi · 2009</p>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/" class="nav-item {% if page == 'dashboard' %}active{% endif %}">
+                    <span class="nav-icon">📊</span> Tableau de bord
+                </a>
+                <a href="/upload" class="nav-item {% if page == 'upload' %}active{% endif %}">
+                    <span class="nav-icon">📤</span> Ajouter un document
+                </a>
+                <a href="/documents" class="nav-item {% if page == 'documents' %}active{% endif %}">
+                    <span class="nav-icon">📄</span> Mes documents
+                </a>
+                <a href="/history" class="nav-item {% if page == 'history' %}active{% endif %}">
+                    <span class="nav-icon">🔧</span> Historique entretien
+                </a>
+                <a href="/schedule" class="nav-item {% if page == 'schedule' %}active{% endif %}">
+                    <span class="nav-icon">📅</span> Planning révisions
+                </a>
+                <a href="/mileage" class="nav-item {% if page == 'mileage' %}active{% endif %}">
+                    <span class="nav-icon">🛣️</span> Kilométrage
+                </a>
+                <a href="/export" class="nav-item {% if page == 'export' %}active{% endif %}">
+                    <span class="nav-icon">📥</span> Exporter le carnet
+                </a>
+                <div class="nav-divider"></div>
+                <a href="/settings" class="nav-item {% if page == 'settings' %}active{% endif %}">
+                    <span class="nav-icon">⚙️</span> Paramètres
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="vehicle-mini" id="sidebar-vehicle">
+                    <div class="vehicle-mini-icon">🚙</div>
+                    <div>
+                        <strong id="sv-name">Chargement…</strong>
+                        <small id="sv-km">— km</small>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main-content">
+            <header class="topbar">
+                <div class="topbar-title">
+                    {% block page_title %}<h2>Tableau de bord</h2>{% endblock %}
+                </div>
+                <div class="topbar-actions">
+                    <div class="alert-bell" id="alert-bell" title="Alertes">
+                        🔔
+                        <span class="alert-badge" id="alert-badge" style="display:none">0</span>
+                    </div>
+                </div>
+            </header>
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Alertes panel (slide-in) -->
+    <div class="alerts-panel" id="alerts-panel">
+        <div class="alerts-panel-header">
+            <h3>🔔 Alertes</h3>
+            <button class="btn-close" onclick="toggleAlerts()">✕</button>
+        </div>
+        <div class="alerts-panel-body" id="alerts-list">
+            <p class="text-muted">Chargement…</p>
+        </div>
+    </div>
+    <div class="alerts-overlay" id="alerts-overlay" onclick="toggleAlerts()"></div>
+
+    <script src="/static/js/app.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}Kilométrage — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>🛣️ Suivi du kilométrage</h2>{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>➕ Nouveau relevé</h3>
+                <p class="card-subtitle">Saisissez le kilométrage actuel de votre C2</p>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Kilométrage</label>
+                <input type="number" class="form-control" id="km-value" placeholder="Ex : 198500">
+            </div>
+            <div class="form-group">
+                <label>Date du relevé</label>
+                <input type="date" class="form-control" id="km-date">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Source</label>
+            <select class="form-control" id="km-source">
+                <option value="saisie_manuelle">Saisie manuelle (compteur)</option>
+                <option value="ct">Contrôle technique</option>
+                <option value="plein_essence">Plein de carburant</option>
+                <option value="autre">Autre</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Notes (optionnel)</label>
+            <input type="text" class="form-control" id="km-notes" placeholder="Ex : relevé chez le garagiste italien">
+        </div>
+        <button class="btn btn-primary" onclick="addMileage()">💾 Enregistrer le relevé</button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>📊 Évolution</h3>
+                <p class="card-subtitle">Kilométrage dans le temps</p>
+            </div>
+        </div>
+        <div id="km-chart"><p class="text-muted">Chargement…</p></div>
+        <div id="km-stats" class="mt-2"></div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header"><h3>📜 Historique des relevés</h3></div>
+    <div class="table-container">
+        <table class="data-table">
+            <thead><tr><th>Date</th><th>Kilométrage</th><th>Écart</th><th>Source</th><th>Notes</th></tr></thead>
+            <tbody id="km-tbody">
+                <tr><td colspan="5" class="text-muted text-center">Chargement…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadMileage() {
+    const tbody = document.getElementById('km-tbody');
+    try {
+        const records = await apiGet('/mileage');
+        if (!records.length) {
+            tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🛣️</div><h3>Aucun relevé</h3><p>Commencez par saisir votre kilométrage actuel.</p></div></td></tr>';
+            document.getElementById('km-chart').innerHTML = '<p class="text-muted">Pas assez de données.</p>';
+            return;
+        }
+        // Trier par date croissante pour le graphique
+        const sorted = [...records].sort((a, b) => new Date(a.recorded_at) - new Date(b.recorded_at));
+
+        tbody.innerHTML = [...records].map((r, i, arr) => {
+            // écart avec le relevé précédent (chronologique)
+            const idx = sorted.findIndex(s => s.id === r.id);
+            const prev = idx > 0 ? sorted[idx - 1] : null;
+            const diff = prev ? r.mileage - prev.mileage : null;
+            return `
+                <tr>
+                    <td class="text-mono">${formatDate(r.recorded_at)}</td>
+                    <td class="text-mono"><strong>${new Intl.NumberFormat('fr-FR').format(r.mileage)} km</strong></td>
+                    <td class="text-mono">${diff !== null ? (diff >= 0 ? '+' : '') + new Intl.NumberFormat('fr-FR').format(diff) + ' km' : '—'}</td>
+                    <td><span class="badge badge-info">${escapeHtml(r.source || '—')}</span></td>
+                    <td class="text-sm text-muted">${escapeHtml(r.notes || '')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        renderChart(sorted);
+        renderStats(sorted);
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Erreur</td></tr>';
+    }
+}
+
+function renderChart(sorted) {
+    const chartEl = document.getElementById('km-chart');
+    if (sorted.length < 2) {
+        chartEl.innerHTML = '<p class="text-muted">Ajoutez au moins 2 relevés pour voir l\'évolution.</p>';
+        return;
+    }
+    const maxKm = Math.max(...sorted.map(r => r.mileage));
+    const minKm = Math.min(...sorted.map(r => r.mileage));
+    const range = (maxKm - minKm) || 1;
+    const points = sorted.map(r => {
+        const pct = ((r.mileage - minKm) / range) * 100;
+        return { ...r, pct };
+    });
+    chartEl.innerHTML = `
+        <div style="position:relative; height:200px; display:flex; align-items:flex-end; gap:4px; padding:10px 0; border-bottom:1px solid var(--border);">
+            ${points.map(p => `
+                <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%;"
+                     title="${formatDate(p.recorded_at)} — ${new Intl.NumberFormat('fr-FR').format(p.mileage)} km">
+                    <div style="width:100%; max-width:30px; height:${Math.max(p.pct, 3)}%; background:linear-gradient(to top, var(--accent), #8b5cf6); border-radius:4px 4px 0 0; transition:var(--transition);"></div>
+                    <small class="text-muted" style="font-size:9px; margin-top:4px; transform:rotate(-45deg); transform-origin:top left; white-space:nowrap;">${formatDate(p.recorded_at).substring(0, 5)}</small>
+                </div>
+            `).join('')}
+        </div>
+        <div class="flex-between text-muted text-sm mt-1">
+            <span>${new Intl.NumberFormat('fr-FR').format(minKm)} km</span>
+            <span>${new Intl.NumberFormat('fr-FR').format(maxKm)} km</span>
+        </div>
+    `;
+}
+
+function renderStats(sorted) {
+    const el = document.getElementById('km-stats');
+    if (sorted.length < 2) { el.innerHTML = ''; return; }
+    const first = sorted[0], last = sorted[sorted.length - 1];
+    const totalKm = last.mileage - first.mileage;
+    const days = (new Date(last.recorded_at) - new Date(first.recorded_at)) / 86400000;
+    const perDay = days > 0 ? totalKm / days : 0;
+    el.innerHTML = `
+        <div class="stats-grid" style="margin-bottom:0;">
+            <div class="stat-card">
+                <div class="stat-icon blue">📏</div>
+                <div class="stat-info"><h4>${new Intl.NumberFormat('fr-FR').format(totalKm)} km</h4><p>Parcourus (période suivie)</p></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">📈</div>
+                <div class="stat-info"><h4>${new Intl.NumberFormat('fr-FR').format(Math.round(perDay * 365))} km/an</h4><p>Moyenne estimée</p></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon cyan">📊</div>
+                <div class="stat-info"><h4>${sorted.length}</h4><p>Relevés enregistrés</p></div>
+            </div>
+        </div>
+    `;
+}
+
+async function addMileage() {
+    const km = parseInt(document.getElementById('km-value').value);
+    const date = document.getElementById('km-date').value;
+    if (!km || !date) { showToast('⚠️ Kilométrage et date obligatoires', 'warning'); return; }
+    try {
+        await apiPost('/mileage', {
+            mileage: km,
+            recorded_at: date,
+            source: document.getElementById('km-source').value,
+            notes: document.getElementById('km-notes').value || null,
+        });
+        showToast('✅ Relevé enregistré', 'success');
+        document.getElementById('km-value').value = '';
+        document.getElementById('km-notes').value = '';
+        loadMileage();
+        loadSidebarVehicle();
+        loadAlertBadge();
+    } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('km-date').valueAsDate = new Date();
+    loadMileage();
+});
+</script>
+{% endblock %}

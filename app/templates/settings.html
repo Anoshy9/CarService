@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Paramètres — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>⚙️ Paramètres</h2>{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+    <!-- Infos véhicule -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>🚗 Véhicule</h3>
+                <p class="card-subtitle">Informations de votre Citroën C2</p>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Marque</label>
+                <input type="text" class="form-control" id="v-brand">
+            </div>
+            <div class="form-group">
+                <label>Modèle</label>
+                <input type="text" class="form-control" id="v-model">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Motorisation</label>
+                <input type="text" class="form-control" id="v-engine">
+            </div>
+            <div class="form-group">
+                <label>Année</label>
+                <input type="number" class="form-control" id="v-year">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Carburant</label>
+                <select class="form-control" id="v-fuel">
+                    <option>Diesel</option>
+                    <option>Essence</option>
+                    <option>Hybride</option>
+                    <option>Électrique</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Couleur</label>
+                <input type="text" class="form-control" id="v-color">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>N° VIN (17 caractères)</label>
+                <input type="text" class="form-control" id="v-vin" maxlength="17" placeholder="VF7JM8HXC...">
+            </div>
+            <div class="form-group">
+                <label>Immatriculation</label>
+                <input type="text" class="form-control" id="v-plate" placeholder="AB-123-CD">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>1ère mise en circulation</label>
+                <input type="date" class="form-control" id="v-first-reg">
+            </div>
+            <div class="form-group">
+                <label>Kilométrage actuel</label>
+                <input type="number" class="form-control" id="v-current-km">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea class="form-control" id="v-notes" rows="3" placeholder="Historique particulier, options, etc."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="saveVehicle()">💾 Enregistrer</button>
+    </div>
+
+    <!-- Infos OCR -->
+    <div>
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h3>🔬 Configuration OCR</h3>
+                    <p class="card-subtitle">Moteur de reconnaissance de texte</p>
+                </div>
+            </div>
+            <div id="ocr-config"><p class="text-muted">Chargement…</p></div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><h3>ℹ️ À propos</h3></div>
+            <ul class="info-list">
+                <li><span class="label">Application</span><span class="value">Carnet d'Entretien Automobile</span></li>
+                <li><span class="label">Version</span><span class="value" id="app-version">—</span></li>
+                <li><span class="label">Véhicule cible</span><span class="value">Citroën C2 1.4 HDi 2009</span></li>
+                <li><span class="label">Base de données</span><span class="value">SQLite (locale)</span></li>
+            </ul>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><h3>⚠️ Zone de danger</h3></div>
+            <p class="text-muted text-sm mb-2">Ces actions sont irréversibles.</p>
+            <button class="btn btn-danger btn-sm" onclick="alert('Fonctionnalité de réinitialisation à venir. Sauvegardez votre dossier data/ avant toute manipulation.')">🗑️ Réinitialiser la base de données</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadVehicle() {
+    try {
+        const v = await apiGet('/vehicle');
+        document.getElementById('v-brand').value = v.brand || '';
+        document.getElementById('v-model').value = v.model || '';
+        document.getElementById('v-engine').value = v.engine || '';
+        document.getElementById('v-year').value = v.year || '';
+        document.getElementById('v-fuel').value = v.fuel || 'Diesel';
+        document.getElementById('v-color').value = v.color || '';
+        document.getElementById('v-vin').value = v.vin || '';
+        document.getElementById('v-plate').value = v.plate || '';
+        document.getElementById('v-first-reg').value = v.first_registration || '';
+        document.getElementById('v-current-km').value = v.current_mileage || '';
+        document.getElementById('v-notes').value = v.notes || '';
+    } catch (e) { showToast('Erreur de chargement', 'error'); }
+}
+
+async function saveVehicle() {
+    const data = {
+        brand: document.getElementById('v-brand').value,
+        model: document.getElementById('v-model').value,
+        engine: document.getElementById('v-engine').value,
+        year: parseInt(document.getElementById('v-year').value) || null,
+        fuel: document.getElementById('v-fuel').value,
+        color: document.getElementById('v-color').value || null,
+        vin: document.getElementById('v-vin').value || null,
+        plate: document.getElementById('v-plate').value || null,
+        first_registration: document.getElementById('v-first-reg').value || null,
+        current_mileage: parseInt(document.getElementById('v-current-km').value) || null,
+        notes: document.getElementById('v-notes').value || null,
+    };
+    try {
+        await apiPut('/vehicle', data);
+        showToast('✅ Véhicule enregistré', 'success');
+        loadSidebarVehicle();
+        loadAlertBadge();
+    } catch (e) { showToast('Erreur: ' + e.message, 'error'); }
+}
+
+async function loadOcrConfig() {
+    try {
+        const c = await apiGet('/config/languages');
+        const flags = { fr: '🇫🇷', en: '🇬🇧', it: '🇮🇹', de: '🇩🇪', es: '🇪🇸', pt: '🇵🇹', nl: '🇳🇱' };
+        document.getElementById('ocr-config').innerHTML = `
+            <ul class="info-list">
+                <li><span class="label">Moteur OCR</span><span class="value">${escapeHtml(c.ocr_engine)}</span></li>
+                <li><span class="label">Langues supportées</span><span class="value">${c.ocr_languages.map(l => flags[l] + ' ' + l.toUpperCase()).join(' · ')}</span></li>
+                <li><span class="label">Seuil de confiance</span><span class="value">${Math.round(c.confidence_threshold * 100)}%</span></li>
+                <li><span class="label">Formats acceptés</span><span class="value">${c.allowed_extensions.join(', ')}</span></li>
+            </ul>
+            <p class="text-muted text-sm mt-2">En dessous du seuil de confiance, les zones sont signalées comme illisibles et une alerte est créée pour relecture manuelle.</p>
+        `;
+    } catch (e) { /* silencieux */ }
+}
+
+async function loadVersion() {
+    try {
+        const h = await apiGet('/health');
+        document.getElementById('app-version').textContent = h.version;
+    } catch (e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadVehicle();
+    loadOcrConfig();
+    loadVersion();
+});
+</script>
+{% endblock %}

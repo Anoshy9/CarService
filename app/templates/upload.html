@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Ajouter un document — Carnet d'Entretien C2{% endblock %}
+{% block page_title %}<h2>📤 Ajouter un document</h2>{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="grid-template-columns: 1fr 1fr;">
+    <!-- Zone d'upload -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>📷 Photo ou 📄 PDF</h3>
+                <p class="card-subtitle">Facture, contrôle technique, devis…<br>Langues : 🇫🇷 🇬🇧 🇮🇹 🇩🇪 🇪🇸 🇵🇹 🇳🇱</p>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Type de document</label>
+            <select class="form-control" id="doc-type">
+                <option value="facture">🧾 Facture (réparation / révision)</option>
+                <option value="controle_technique">🔍 Contrôle technique</option>
+                <option value="devis">📋 Devis</option>
+                <option value="recu">🧾 Reçu / bon d'achat</option>
+                <option value="autre">📄 Autre</option>
+            </select>
+        </div>
+
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+            <input type="file" id="file-input" multiple
+                   accept=".pdf,.png,.jpg,.jpeg,.tiff,.bmp,.webp"
+                   onchange="handleFiles(this.files)">
+            <div class="upload-icon">📤</div>
+            <h3>Glissez-déposez ou cliquez</h3>
+            <p>PDF, PNG, JPG, TIFF, WEBP — max 50 Mo par fichier<br>
+               <small>💡 Depuis votre téléphone : prenez la photo directement ou choisissez un PDF</small></p>
+        </div>
+
+        <div class="upload-preview" id="upload-preview"></div>
+
+        <div class="mt-2">
+            <button class="btn btn-primary btn-lg" id="upload-btn" onclick="uploadFiles()" disabled style="width:100%;">
+                🚀 Envoyer et analyser (OCR)
+            </button>
+        </div>
+
+        <div id="upload-progress" class="mt-2 hidden">
+            <p class="text-muted text-sm mb-1" id="progress-text">Analyse en cours…</p>
+            <div class="progress-bar"><div class="progress-bar-fill blue" id="progress-fill" style="width:0%"></div></div>
+        </div>
+    </div>
+
+    <!-- Résultat du dernier traitement -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>🔍 Résultat de l'analyse</h3>
+                <p class="card-subtitle">Données extraites automatiquement par OCR</p>
+            </div>
+        </div>
+        <div id="result-box">
+            <div class="empty-state">
+                <div class="empty-icon">🔬</div>
+                <h3>En attente</h3>
+                <p>Envoyez un document pour voir l'extraction automatique ici.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Info OCR -->
+<div class="card mt-3">
+    <div class="card-header"><h3>ℹ️ Fonctionnement de l'OCR</h3></div>
+    <div class="grid-3">
+        <div>
+            <h4 style="font-size:14px; margin-bottom:8px;">🌍 Multilingue</h4>
+            <p class="text-muted text-sm">L'OCR lit automatiquement le français, l'anglais, l'italien, l'allemand, l'espagnol, le portugais et le néerlandais. Vos factures d'Italie 🇮🇹 et d'Angleterre 🇬🇧 sont prises en charge.</p>
+        </div>
+        <div>
+            <h4 style="font-size:14px; margin-bottom:8px;">⚠️ Zones illisibles</h4>
+            <p class="text-muted text-sm">Si une zone du document est floue, peu contrastée ou illisible, l'OCR vous en avertit avec un récapitulatif. Vous pouvez alors corriger manuellement les champs.</p>
+        </div>
+        <div>
+            <h4 style="font-size:14px; margin-bottom:8px;">🔧 Extraction intelligente</h4>
+            <p class="text-muted text-sm">Date, garage, pays, kilométrage, montants HT/TTC, lignes de travaux et pièces sont extraits automatiquement et alimentent votre carnet d'entretien.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedFiles = [];
+
+const zone = document.getElementById('upload-zone');
+
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+});
+
+function handleFiles(files) {
+    for (const f of files) {
+        selectedFiles.push(f);
+    }
+    renderPreview();
+}
+
+function renderPreview() {
+    const preview = document.getElementById('upload-preview');
+    preview.innerHTML = selectedFiles.map((f, i) => {
+        const icon = f.type === 'application/pdf' ? '📄' : '🖼️';
+        return `
+            <div class="upload-item">
+                <button class="remove-btn" onclick="removeFile(${i})">✕</button>
+                <div class="file-icon">${icon}</div>
+                <div class="file-name">${escapeHtml(f.name)}</div>
+                <small class="text-muted">${(f.size / 1024).toFixed(0)} Ko</small>
+            </div>
+        `;
+    }).join('');
+    document.getElementById('upload-btn').disabled = selectedFiles.length === 0;
+}
+
+function removeFile(i) {
+    selectedFiles.splice(i, 1);
+    renderPreview();
+}
+
+async function uploadFiles() {
+    if (!selectedFiles.length) return;
+    const btn = document.getElementById('upload-btn');
+    const progress = document.getElementById('upload-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressText = document.getElementById('progress-text');
+    btn.disabled = true;
+    progress.classList.remove('hidden');
+
+    const docType = document.getElementById('doc-type').value;
+    let lastResult = null;
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+        const f = selectedFiles[i];
+        progressText.textContent = `Analyse de « ${f.name} » (${i + 1}/${selectedFiles.length})… L'OCR multilingue est en cours…`;
+        progressFill.style.width = `${((i) / selectedFiles.length) * 100}%`;
+
+        const formData = new FormData();
+        formData.append('file', f);
+        formData.append('doc_type', docType);
+        formData.append('auto_process', 'true');
+
+        try {
+            const res = await fetch(API + '/documents/upload', { method: 'POST', body: formData });
+            if (!res.ok) throw new Error(`Erreur ${res.status}`);
+            lastResult = await res.json();
+            showToast(`✅ ${f.name} analysé`, 'success');
+        } catch (e) {
+            showToast(`❌ Erreur sur ${f.name}: ${e.message}`, 'error');
+        }
+        progressFill.style.width = `${((i + 1) / selectedFiles.length) * 100}%`;
+    }
+
+    progress.classList.add('hidden');
+    btn.disabled = false;
+    selectedFiles = [];
+    renderPreview();
+
+    if (lastResult) showResult(lastResult);
+    loadAlertBadge();
+    loadSidebarVehicle();
+}
+
+function showResult(r) {
+    const box = document.getElementById('result-box');
+    const confidencePct = r.ocr_confidence !== null && r.ocr_confidence !== undefined
+        ? Math.round(r.ocr_confidence * 100) + '%' : '—';
+    const langFlag = { fr: '🇫🇷', en: '🇬🇧', it: '🇮🇹', de: '🇩🇪', es: '🇪🇸', pt: '🇵🇹', nl: '🇳🇱' }[r.detected_language] || '🌍';
+
+    let unreadableHtml = '';
+    if (r.unreadable_zones_count > 0) {
+        unreadableHtml = `
+            <div class="unreadable-zone">
+                <strong>⚠️ ${r.unreadable_zones_count} zone(s) illisible(s)</strong>
+                <p class="text-sm">Certaines parties du document n'ont pas pu être lues avec certitude. Veuillez vérifier le document original.</p>
+                <ul class="text-sm mt-1">
+                    ${(r.unreadable_zones || []).map(z => `<li>Page ${z.page} : « ${escapeHtml(z.text_attempted.substring(0, 60))} » (confiance ${Math.round(z.confidence * 100)}%)</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    box.innerHTML = `
+        <ul class="info-list">
+            <li><span class="label">Document</span><span class="value">${escapeHtml(r.filename)}</span></li>
+            <li><span class="label">Langue détectée</span><span class="value">${langFlag} ${r.detected_language || '—'}</span></li>
+            <li><span class="label">Date du document</span><span class="value">${formatDate(r.document_date)}</span></li>
+            <li><span class="label">Garage</span><span class="value">${escapeHtml(r.garage_name || '—')}</span></li>
+            <li><span class="label">Pays</span><span class="value">${r.garage_country ? countryFlag(r.garage_country) + ' ' + escapeHtml(r.garage_country) : '—'}</span></li>
+            <li><span class="label">Kilométrage</span><span class="value">${formatKm(r.mileage_at_service)}</span></li>
+            <li><span class="label">Montant TTC</span><span class="value">${formatMoney(r.total_ttc, r.currency)}</span></li>
+            <li><span class="label">Confiance OCR</span><span class="value">${confidencePct}</span></li>
+            <li><span class="label">Zones illisibles</span><span class="value">${r.unreadable_zones_count || 0}</span></li>
+        </ul>
+        ${unreadableHtml}
+        <div class="mt-2 flex gap-1">
+            <a href="/documents/${r.document_id}" class="btn btn-primary btn-sm">Voir le détail</a>
+            <a href="/documents" class="btn btn-secondary btn-sm">Tous les documents</a>
+        </div>
+    `;
+}
+</script>
+{% endblock %}
