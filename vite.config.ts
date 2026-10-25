@@ -13,7 +13,8 @@ export default defineConfig({
         name: 'TaxTrack UK',
         short_name: 'TaxTrack',
         description:
-          'Suivi des reçus, frais de location et versements SIPP pour la Self Assessment HMRC.',
+          'Receipts, rental expenses and SIPP contributions for the HMRC Self Assessment.',
+        lang: 'en-GB',
         theme_color: '#1d4ed8',
         background_color: '#f8fafc',
         display: 'standalone',

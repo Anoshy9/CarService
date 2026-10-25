@@ -54,7 +54,7 @@ export function RentalView() {
   const handleAdd = async () => {
     const value = Number.parseFloat(amount)
     if (!Number.isFinite(value) || value <= 0) {
-      alert('Merci de saisir un montant valide.')
+      alert('Please enter a valid amount.')
       return
     }
     await addRentalEntry({
@@ -70,7 +70,7 @@ export function RentalView() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cette ligne ?')) return
+    if (!confirm('Delete this entry?')) return
     await deleteRentalEntry(id)
     refresh()
   }
@@ -78,7 +78,7 @@ export function RentalView() {
   const handleExportCsv = () => {
     downloadBlob(
       new Blob([rentalCsv(yearEntries, selectedYear, { usePropertyAllowance: useAllowance })], { type: 'text/csv;charset=utf-8' }),
-      `taxtrack-location-${formatTaxYear(selectedYear).replace('/', '-')}.csv`,
+      `taxtrack-rental-${formatTaxYear(selectedYear).replace('/', '-')}.csv`,
     )
   }
 
@@ -98,51 +98,51 @@ export function RentalView() {
   return (
     <>
       <div className="card">
-        <h2>🏠 Location — année fiscale</h2>
+        <h2>🏠 Rental — tax year</h2>
         <div className="fy-selector">
           <button onClick={() => moveYear(-1)}>‹</button>
           <span className="fy-label">{formatTaxYear(selectedYear)}</span>
           <button onClick={() => moveYear(1)}>›</button>
         </div>
         <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, textAlign: 'center' }}>
-          du 6 avril {selectedYear.label - 1} au 5 avril {selectedYear.label}
+          from 6 April {selectedYear.label - 1} to 5 April {selectedYear.label}
         </p>
       </div>
 
       <div className="card">
         <div className="row">
-          <span className="label">Revenus locatifs</span>
+          <span className="label">Rental income</span>
           <span className="value positive">£{summary.income.toFixed(2)}</span>
         </div>
         {summary.propertyAllowanceExempt && (
           <p className="ocr-status" style={{ background: '#f0fdf4', color: '#15803d', marginTop: 8 }}>
-            ✅ Revenus ≤ £1,000 : exonérés via la property allowance (s.783B), rien à déclarer.
+            ✅ Income ≤ £1,000: exempt via the property allowance (s.783B), nothing to declare.
           </p>
         )}
         {!summary.propertyAllowanceExempt && !useAllowance && (
           <div className="row">
-            <span className="label">Frais déductibles</span>
+            <span className="label">Deductible expenses</span>
             <span className="value negative">−£{summary.deductibleExpenses.toFixed(2)}</span>
           </div>
         )}
         {summary.capitalExpenditure > 0 && (
           <div className="row">
             <span className="label">
-              Améliorations (capital)
-              <span className="sub">non déductibles — conservées pour le CGT en cas de vente</span>
+              Improvements (capital)
+              <span className="sub">not deductible — kept for CGT on a future sale</span>
             </span>
             <span className="value">£{summary.capitalExpenditure.toFixed(2)}</span>
           </div>
         )}
         <div className="row">
           <span className="label">
-            Bénéfice imposable
+            Taxable profit
             <span className="sub">
               {summary.propertyAllowanceElected
-                ? 'revenus − £1,000 (property allowance)'
+                ? 'income − £1,000 (property allowance)'
                 : summary.propertyAllowanceExempt
-                  ? 'exonéré'
-                  : 'avant crédit d’impôt sur les intérêts'}
+                  ? 'exempt'
+                  : 'before tax credit on interest'}
             </span>
           </span>
           <span className={`value ${summary.taxableProfit >= 0 ? 'positive' : 'negative'}`}>
@@ -152,8 +152,8 @@ export function RentalView() {
         {summary.financeCostCredit > 0 && (
           <div className="row">
             <span className="label">
-              Crédit d’impôt (intérêts, 20 %)
-              <span className="sub">réduit l’impôt à payer, pas le bénéfice</span>
+              Tax credit (interest, 20%)
+              <span className="sub">reduces the tax you pay, not the profit</span>
             </span>
             <span className="value positive">£{summary.financeCostCredit.toFixed(2)}</span>
           </div>
@@ -162,19 +162,19 @@ export function RentalView() {
           <>
             <div className="row" onClick={toggleAllowance} style={{ cursor: 'pointer' }}>
               <span className="label">
-                Abattement forfaitaire £1,000 (property allowance)
+                £1,000 flat allowance (property allowance)
                 <span className="sub">
                   {useAllowance
-                    ? 'activé : remplace tous les frais, y compris le crédit sur les intérêts'
-                    : 'désactivé : frais réels déclarés'}
+                    ? 'on: replaces all expenses, including the interest credit'
+                    : 'off: actual expenses declared'}
                 </span>
               </span>
               <input type="checkbox" checked={useAllowance} readOnly />
             </div>
             {allowanceRecommended && (
               <p className="ocr-status" style={{ background: '#f0fdf4', color: '#15803d', marginTop: 8 }}>
-                💡 Tes frais réels (£{summary.deductibleExpenses.toFixed(2)}) sont inférieurs à £1,000 :
-                l’abattement forfaitaire serait plus avantageux. Coche la case ci-dessus.
+                💡 Your actual expenses (£{summary.deductibleExpenses.toFixed(2)}) are below £1,000:
+                the flat allowance would be more advantageous. Tick the box above.
               </p>
             )}
           </>
@@ -182,18 +182,18 @@ export function RentalView() {
       </div>
 
       <div className="card">
-        <h2>Ajouter une ligne</h2>
+        <h2>Add an entry</h2>
         <label className="field">
           Type
           <select value={category} onChange={(e) => setCategory(e.target.value as CategoryId)}>
-            <optgroup label="Revenus">
+            <optgroup label="Income">
               {incomeCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
                 </option>
               ))}
             </optgroup>
-            <optgroup label="Frais déductibles">
+            <optgroup label="Deductible expenses">
               {expenseCategories
                 .filter((c) => !c.taxCredit)
                 .map((c) => (
@@ -202,14 +202,14 @@ export function RentalView() {
                   </option>
                 ))}
             </optgroup>
-            <optgroup label="Capital (non déductible, CGT)">
+            <optgroup label="Capital (not deductible, CGT)">
               {capitalCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.label}
                 </option>
               ))}
             </optgroup>
-            <optgroup label="Crédit d’impôt">
+            <optgroup label="Tax credit">
               {expenseCategories
                 .filter((c) => c.taxCredit)
                 .map((c) => (
@@ -221,7 +221,7 @@ export function RentalView() {
           </select>
         </label>
         <label className="field">
-          Montant (£)
+          Amount (£)
           <input
             type="number"
             step="0.01"
@@ -236,25 +236,25 @@ export function RentalView() {
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className="field">
-          Note (optionnel)
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex : facture EDF janvier" />
+          Note (optional)
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="E.g. EDF bill, January" />
         </label>
         <button className="btn" onClick={handleAdd}>
-          ➕ Ajouter
+          ➕ Add
         </button>
       </div>
 
       <div className="card">
-        <h2>Par catégorie</h2>
+        <h2>By category</h2>
         {CATEGORIES.filter((c) => totals[c.id] > 0).length === 0 && (
-          <p className="empty-state">Aucune donnée pour cette année fiscale.</p>
+          <p className="empty-state">No data for this tax year.</p>
         )}
         {CATEGORIES.filter((c) => totals[c.id] > 0).map((c) => (
           <div className="row" key={c.id}>
             <span className="label">
               {c.label}
-              {c.taxCredit && <span className="sub">crédit d’impôt 20 %</span>}
-              {c.capital && <span className="sub">capital — non déductible (base cost CGT)</span>}
+              {c.taxCredit && <span className="sub">20% tax credit</span>}
+              {c.capital && <span className="sub">capital — not deductible (CGT base cost)</span>}
             </span>
             <span className="value">£{totals[c.id].toFixed(2)}</span>
           </div>
@@ -262,14 +262,14 @@ export function RentalView() {
       </div>
 
       <div className="card">
-        <h2>Lignes de l’année ({yearEntries.length})</h2>
-        {yearEntries.length === 0 && <p className="empty-state">Rien à afficher.</p>}
+        <h2>Entries for the year ({yearEntries.length})</h2>
+        {yearEntries.length === 0 && <p className="empty-state">Nothing to display.</p>}
         {yearEntries.map((e) => (
           <div className="row" key={e.id}>
             <span className="label">
               {getCategory(e.category).label}
               <span className="sub">
-                {new Date(e.date).toLocaleDateString('fr-FR')}
+                {new Date(e.date).toLocaleDateString('en-GB')}
                 {e.note ? ` · ${e.note}` : ''}
               </span>
             </span>
@@ -284,10 +284,10 @@ export function RentalView() {
       </div>
 
       <div className="card">
-        <h2>Exporter pour la déclaration</h2>
+        <h2>Export for your tax return</h2>
         <div className="camera-actions">
           <button className="btn" onClick={handleExportCsv}>
-            ⬇️ Export CSV
+            ⬆️ Export CSV
           </button>
           <button
             className="btn secondary"
@@ -299,10 +299,10 @@ export function RentalView() {
       </div>
 
       <p className="disclaimer">
-        ⚠️ Estimation à titre indicatif. Points à vérifier avec un comptable : réparations
-        déductibles vs améliorations (capital), RDIR (remplacement « like-for-like » d’objets
-        mobiliers uniquement), « wholly and exclusively », pertes locatives reportables uniquement
-        sur de futurs revenus locatifs, et base « cash basis » jusqu’à £150,000 de recettes.
+        ⚠️ Indicative estimate. Points to check with an accountant: deductible repairs vs capital
+        improvements, RDIR (like-for-like replacement of movable domestic items only),
+        "wholly and exclusively", rental losses can only be offset against future rental
+        income, and the cash basis applies up to £150,000 of receipts.
       </p>
     </>
   )

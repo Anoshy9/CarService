@@ -57,12 +57,12 @@ export function DashboardView() {
 
   const handleExportAll = () => {
     const parts = [
-      `# TaxTrack UK — export complet — année fiscale ${formatTaxYear(taxYear)}`,
+      `# TaxTrack UK — full export — tax year ${formatTaxYear(taxYear)}`,
       '',
-      '## Reçus',
+      '## Receipts',
       receiptsCsv(yearReceipts),
       '',
-      '## Location',
+      '## Rental',
       rentalCsv(yearRental, taxYear, { usePropertyAllowance: settings?.usePropertyAllowance }),
       '',
       '## SIPP',
@@ -77,53 +77,53 @@ export function DashboardView() {
   return (
     <>
       <div className="card">
-        <h2>📊 Année fiscale {formatTaxYear(taxYear)}</h2>
+        <h2>📊 Tax year {formatTaxYear(taxYear)}</h2>
         <p style={{ fontSize: 13, color: '#64748b' }}>
-          du 6 avril {taxYear.label - 1} au 5 avril {taxYear.label}
+          6 April {taxYear.label - 1} to 5 April {taxYear.label}
         </p>
       </div>
 
       <div className="card">
-        <h2>🏠 Location</h2>
+        <h2>🏠 Rental</h2>
         <div className="row">
-          <span className="label">Revenus locatifs</span>
+          <span className="label">Rental income</span>
           <span className="value positive">£{rentalSummary.income.toFixed(2)}</span>
         </div>
         {rentalSummary.propertyAllowanceExempt && (
           <p className="ocr-status" style={{ background: '#f0fdf4', color: '#15803d', marginTop: 8 }}>
-            ✅ Revenus ≤ £1,000 : exonérés via la property allowance, rien à déclarer pour la location.
+            ✅ Income ≤ £1,000: exempt under the property allowance — nothing to report for rental income.
           </p>
         )}
         {rentalSummary.propertyAllowanceElected && (
           <p className="ocr-status" style={{ background: '#eff6ff', color: '#1d4ed8', marginTop: 8 }}>
-            ℹ️ Property allowance £1,000 choisie : bénéfice = revenus − £1,000, aucun frais ni crédit
-            d’intérêt déclaré.
+            ℹ️ £1,000 property allowance elected: profit = income − £1,000; no expenses and no
+            interest credit are reported.
           </p>
         )}
         {!rentalSummary.propertyAllowanceExempt && !rentalSummary.propertyAllowanceElected && (
           <div className="row">
-            <span className="label">Frais déductibles</span>
+            <span className="label">Deductible expenses</span>
             <span className="value negative">−£{rentalSummary.deductibleExpenses.toFixed(2)}</span>
           </div>
         )}
         {rentalSummary.capitalExpenditure > 0 && (
           <div className="row">
             <span className="label">
-              Améliorations (capital, non déductibles)
-              <span className="sub">conservées pour le calcul du CGT en cas de vente</span>
+              Capital improvements (not deductible)
+              <span className="sub">kept for the CGT calculation on a future sale</span>
             </span>
             <span className="value">£{rentalSummary.capitalExpenditure.toFixed(2)}</span>
           </div>
         )}
         <div className="row">
-          <span className="label">Bénéfice imposable</span>
+          <span className="label">Taxable profit</span>
           <span className={`value ${rentalSummary.taxableProfit >= 0 ? 'positive' : 'negative'}`}>
             £{rentalSummary.taxableProfit.toFixed(2)}
           </span>
         </div>
         {rentalSummary.financeCostCredit > 0 && (
           <div className="row">
-            <span className="label">Crédit d’impôt (intérêts 20 %)</span>
+            <span className="label">Tax credit (interest, 20%)</span>
             <span className="value positive">£{rentalSummary.financeCostCredit.toFixed(2)}</span>
           </div>
         )}
@@ -136,68 +136,75 @@ export function DashboardView() {
             })
           }
         >
-          📄 Export PDF location
+          📄 Export rental PDF
         </button>
       </div>
 
       {taxEstimate && (
         <div className="card">
-          <h2>🧾 Impôt estimé (2025/26, Angleterre)</h2>
+          <h2>🧾 Estimated income tax (England, {formatTaxYear(taxYear)})</h2>
           <div className="row">
             <span className="label">
-              Abattement personnel
-              <span className="sub">£12,570, réduit au-delà de £100,000 de revenu</span>
+              Personal Allowance
+              <span className="sub">£12,570, tapered above £100,000 of income</span>
             </span>
             <span className="value">£{taxEstimate.personalAllowance.toFixed(2)}</span>
           </div>
           <div className="row">
-            <span className="label">Impôt sur le revenu (tranches 20/40/45 %)</span>
+            <span className="label">Income tax (20/40/45% bands)</span>
             <span className="value">£{taxEstimate.taxOnIncome.toFixed(2)}</span>
           </div>
           {taxEstimate.financeCostCredit > 0 && (
             <div className="row">
-              <span className="label">Crédit Section 24 (intérêts)</span>
+              <span className="label">Section 24 credit (interest)</span>
               <span className="value positive">−£{taxEstimate.financeCostCredit.toFixed(2)}</span>
             </div>
           )}
           <div className="row">
             <span className="label">
-              <b>Impôt estimé à payer</b>
-              <span className="sub">hors acomptes déjà versés, hors autres revenus non saisis</span>
+              <b>Estimated tax due</b>
+              <span className="sub">before payments on account already made; excludes income not entered here</span>
             </span>
             <span className="big-number">£{taxEstimate.taxDue.toFixed(2)}</span>
           </div>
+          {taxYear.label >= 2028 && (
+            <p className="ocr-status" style={{ background: '#fff7ed', color: '#9a3412', marginTop: 8 }}>
+              ⚠️ From 6 April 2027, rental profit is taxed at dedicated property income rates
+              (22% / 42% / 47%) instead of the standard bands, and the finance-cost credit rises to
+              22%. These estimates use the current-year rules — get advice for 2027/28.
+            </p>
+          )}
         </div>
       )}
 
       <div className="card">
         <h2>💷 SIPP</h2>
         <div className="row">
-          <span className="label">Net versé cette année</span>
+          <span className="label">Net paid this year</span>
           <span className="value">£{sippSummary.netPaid.toFixed(2)}</span>
         </div>
         <div className="row">
           <span className="label">
-            Contribution brute (plafond £{sippSummary.effectiveAnnualAllowance.toLocaleString('en-GB')})
+            Gross contribution (allowance £{sippSummary.effectiveAnnualAllowance.toLocaleString('en-GB')})
           </span>
           <span className="value">£{sippSummary.grossContributions.toFixed(2)}</span>
         </div>
         <div className="row">
-          <span className="label">Relief total (base + complémentaire)</span>
+          <span className="label">Total relief (basic + additional)</span>
           <span className="value positive">
             £{(sippSummary.basicRateRelief + sippSummary.higherRateRelief + sippSummary.additionalRateRelief).toFixed(2)}
           </span>
         </div>
         {sippSummary.overAnnualAllowance && (
           <p className="ocr-status" style={{ background: '#fef2f2', color: '#dc2626', marginTop: 8 }}>
-            ⚠ Plafond annuel dépassé de £{Math.abs(sippSummary.remainingAnnualAllowance).toFixed(2)}
+            ⚠ Annual allowance exceeded by £{Math.abs(sippSummary.remainingAnnualAllowance).toFixed(2)}
           </p>
         )}
         {sippSummary.overReliefCap && (
           <p className="ocr-status" style={{ background: '#fef2f2', color: '#dc2626', marginTop: 8 }}>
-            ⚠ £{sippSummary.grossAboveReliefCap.toFixed(2)} brut au-dessus de ton plafond de relief
-            (£{sippSummary.reliefCapGross.toLocaleString('en-GB')} — règle des relevant UK earnings) :
-            cette part n’ouvre <b>aucun</b> droit à relief fiscal.
+            ⚠ £{sippSummary.grossAboveReliefCap.toFixed(2)} gross is above your relief cap
+            (£{sippSummary.reliefCapGross.toLocaleString('en-GB')} — relevant UK earnings rule): this
+            part earns <b>no</b> tax relief.
           </p>
         )}
         <button
@@ -205,37 +212,37 @@ export function DashboardView() {
           style={{ marginTop: 10 }}
           onClick={() => exportSippPdf(yearSipp, band, taxYear, settings?.sippProfile)}
         >
-          📄 Export PDF SIPP
+          📄 Export SIPP PDF
         </button>
       </div>
 
       <div className="card">
-        <h2>📸 Reçus scannés</h2>
+        <h2>📸 Scanned receipts</h2>
         <div className="row">
-          <span className="label">Reçus cette année</span>
+          <span className="label">Receipts this year</span>
           <span className="value">{yearReceipts.length}</span>
         </div>
         <div className="row">
-          <span className="label">Dépenses « location » des reçus</span>
+          <span className="label">« Rental » expenses from receipts</span>
           <span className="value">£{totalExpenses.toFixed(2)}</span>
         </div>
       </div>
 
       <div className="card">
-        <h2>⬇️ Tout exporter</h2>
+        <h2>⬆️ Export everything</h2>
         <p style={{ fontSize: 13, color: '#64748b', marginBottom: 10 }}>
-          Un seul fichier CSV avec les reçus, la location et le SIPP de l’année fiscale en cours,
-          prêt à être transmis à ton comptable.
+          One CSV file with the receipts, rental and SIPP figures for the current tax year, ready to
+          hand to your accountant.
         </p>
         <button className="btn" onClick={handleExportAll}>
-          ⬇️ Export complet (CSV)
+          ⬆️ Full export (CSV)
         </button>
       </div>
 
       <p className="disclaimer">
-        ⚠️ TaxTrack UK organise tes données et calcule des estimations. Ce n’est pas un conseil
-        fiscal : fais valider ta Self Assessment par un comptable ou un conseiller avant de la
-        soumettre à HMRC (échéance : 31 janvier en ligne, 31 octobre sur papier).
+        ⚠️ TaxTrack UK organises your data and computes estimates. It is not tax advice: have your
+        Self Assessment checked by an accountant or adviser before submitting it to HMRC (deadline:
+        31 January online, 31 October on paper).
       </p>
     </>
   )

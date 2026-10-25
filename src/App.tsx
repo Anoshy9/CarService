@@ -9,12 +9,12 @@ import { SettingsView } from './views/SettingsView'
 type Tab = 'dashboard' | 'receipts' | 'rental' | 'sipp' | 'deadlines' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'dashboard', label: 'Accueil', icon: '📊' },
-  { id: 'receipts', label: 'Reçus', icon: '📸' },
-  { id: 'rental', label: 'Location', icon: '🏠' },
+  { id: 'dashboard', label: 'Home', icon: '📊' },
+  { id: 'receipts', label: 'Receipts', icon: '📸' },
+  { id: 'rental', label: 'Rental', icon: '🏠' },
   { id: 'sipp', label: 'SIPP', icon: '💷' },
-  { id: 'deadlines', label: 'Échéances', icon: '📅' },
-  { id: 'settings', label: 'Réglages', icon: '⚙️' },
+  { id: 'deadlines', label: 'Deadlines', icon: '📅' },
+  { id: 'settings', label: 'Settings', icon: '⚙️' },
 ]
 
 export default function App() {
@@ -24,7 +24,7 @@ export default function App() {
     <>
       <header className="app-header">
         <h1>🇬🇧 TaxTrack UK</h1>
-        <p>Reçus, location & SIPP pour ta déclaration fiscale</p>
+        <p>Receipts, rental & SIPP for your UK tax return</p>
         <nav className="app-nav">
           {TABS.map((t) => (
             <button

@@ -33,38 +33,38 @@ export function deadlinesForTaxYear(taxYear: TaxYear): Deadline[] {
     {
       kind: 'register',
       date: `${end - 1}-10-05`,
-      label: 'Inscription Self Assessment',
-      detail: `Avant le 5 octobre ${end - 1} si tu n'as jamais déclaré (revenus locatifs > £1,000).`,
+      label: 'Register for Self Assessment',
+      detail: `By 5 October ${end - 1} if you have never filed (rental income over £1,000).`,
     },
     {
       kind: 'paper_return',
       date: `${end - 1}-10-31`,
-      label: 'Déclaration papier',
-      detail: `Dossier papier à rendre avant le 31 octobre ${end - 1}.`,
+      label: 'Paper tax return',
+      detail: `Paper return must reach HMRC by 31 October ${end - 1}.`,
     },
     {
       kind: 'online_return',
       date: `${end}-01-31`,
-      label: 'Déclaration en ligne',
-      detail: `Self Assessment en ligne avant le 31 janvier ${end}.`,
+      label: 'Online tax return',
+      detail: `File your Self Assessment online by 31 January ${end}.`,
     },
     {
       kind: 'balancing_payment',
       date: `${end}-01-31`,
-      label: 'Paiement du solde',
-      detail: `Impôt restant dû pour l'année, avant le 31 janvier ${end}.`,
+      label: 'Balancing payment',
+      detail: `Any tax owed for the year, by 31 January ${end}.`,
     },
     {
       kind: 'payment_on_account_1',
       date: `${end}-01-31`,
-      label: '1er acompte (payment on account)',
-      detail: `50 % de l'impôt de l'année précédente, avant le 31 janvier ${end} (si facture > £1,000).`,
+      label: '1st payment on account',
+      detail: `50% of last year's tax bill, by 31 January ${end} (if the bill exceeds £1,000).`,
     },
     {
       kind: 'payment_on_account_2',
       date: `${end}-07-31`,
-      label: '2e acompte (payment on account)',
-      detail: `2e versement de 50 %, avant le 31 juillet ${end}.`,
+      label: '2nd payment on account',
+      detail: `Second 50% instalment, by 31 July ${end}.`,
     },
   ]
 }
@@ -80,26 +80,26 @@ export function mtdQuarterlyDates(taxYear: TaxYear): Deadline[] {
     {
       kind: 'mtd_quarterly',
       date: `${end - 1}-08-07`,
-      label: 'MTD — mise à jour T1',
-      detail: `Résumé numérique du 6 avril au 5 juillet ${end - 1}, à envoyer avant le 7 août ${end - 1}.`,
+      label: 'MTD — quarterly update Q1',
+      detail: `Digital summary for 6 April to 5 July ${end - 1}, due by 7 August ${end - 1}.`,
     },
     {
       kind: 'mtd_quarterly',
       date: `${end - 1}-11-07`,
-      label: 'MTD — mise à jour T2',
-      detail: `Résumé du 6 juillet au 5 octobre ${end - 1}, avant le 7 novembre ${end - 1}.`,
+      label: 'MTD — quarterly update Q2',
+      detail: `Summary for 6 July to 5 October ${end - 1}, due by 7 November ${end - 1}.`,
     },
     {
       kind: 'mtd_quarterly',
       date: `${end}-02-07`,
-      label: 'MTD — mise à jour T3',
-      detail: `Résumé du 6 octobre ${end - 1} au 5 janvier ${end}, avant le 7 février ${end}.`,
+      label: 'MTD — quarterly update Q3',
+      detail: `Summary for 6 October ${end - 1} to 5 January ${end}, due by 7 February ${end}.`,
     },
     {
       kind: 'mtd_quarterly',
       date: `${end}-05-07`,
-      label: 'MTD — mise à jour T4',
-      detail: `Résumé du 6 janvier au 5 avril ${end}, avant le 7 mai ${end}.`,
+      label: 'MTD — quarterly update Q4',
+      detail: `Summary for 6 January to 5 April ${end}, due by 7 May ${end}.`,
     },
   ]
 }
@@ -110,8 +110,9 @@ export function mtdQuarterlyDates(taxYear: TaxYear): Deadline[] {
  *   > £50,000 from April 2026 (i.e. tax year labelled 2027)
  *   > £30,000 from April 2027 (labelled 2028)
  *   > £20,000 from April 2028 (labelled 2029)
- * The obligation for tax year `label` is decided by the gross income
- * reported two years earlier.
+ * The obligation for tax year `label` is decided by the gross qualifying
+ * income reported TWO tax years earlier (e.g. 2024/25 income decides
+ * whether you must use MTD from April 2026).
  */
 export function mtdThresholdForTaxYear(taxYear: TaxYear): number | null {
   if (taxYear.label >= 2029) return 20000

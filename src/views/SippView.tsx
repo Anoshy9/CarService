@@ -18,9 +18,9 @@ import { isInTaxYear, listRecentTaxYears, parseISODate, toISODate, formatTaxYear
 import { downloadBlob, exportSippPdf, sippCsv } from '../lib/export'
 
 const BANDS: { id: TaxBand; label: string; description: string }[] = [
-  { id: 'basic', label: 'Taux de base (20 %)', description: 'Revenus jusqu’à £50,270' },
-  { id: 'higher', label: 'Taux supérieur (40 %)', description: '£50,271 – £125,140' },
-  { id: 'additional', label: 'Taux additionnel (45 %)', description: 'Au-delà de £125,140' },
+  { id: 'basic', label: 'Basic rate (20%)', description: 'Income up to £50,270' },
+  { id: 'higher', label: 'Higher rate (40%)', description: '£50,271 – £125,140' },
+  { id: 'additional', label: 'Additional rate (45%)', description: 'Above £125,140' },
 ]
 
 export function SippView() {
@@ -71,7 +71,7 @@ export function SippView() {
   const handleAdd = async () => {
     const value = Number.parseFloat(netAmount)
     if (!Number.isFinite(value) || value <= 0) {
-      alert('Merci de saisir un montant valide.')
+      alert('Please enter a valid amount.')
       return
     }
     await addSippContribution({
@@ -88,7 +88,7 @@ export function SippView() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer ce versement ?')) return
+    if (!confirm('Delete this contribution?')) return
     await deleteSippContribution(id)
     refresh()
   }
@@ -105,19 +105,19 @@ export function SippView() {
   return (
     <>
       <div className="card">
-        <h2>💷 SIPP — versements retraite</h2>
+        <h2>💷 SIPP — pension contributions</h2>
         <div className="fy-selector">
           <button onClick={() => moveYear(-1)}>‹</button>
           <span className="fy-label">{formatTaxYear(selectedYear)}</span>
           <button onClick={() => moveYear(1)}>›</button>
         </div>
         <p style={{ fontSize: 12, color: '#64748b', marginTop: 4, textAlign: 'center' }}>
-          du 6 avril {selectedYear.label - 1} au 5 avril {selectedYear.label}
+          from 6 April {selectedYear.label - 1} to 5 April {selectedYear.label}
         </p>
       </div>
 
       <div className="card">
-        <h2>Ta tranche d’imposition</h2>
+        <h2>Your tax band</h2>
         {BANDS.map((b) => (
           <div className="row" key={b.id} onClick={() => handleBandChange(b.id)} style={{ cursor: 'pointer' }}>
             <span className="label">
@@ -128,28 +128,28 @@ export function SippView() {
           </div>
         ))}
         <p style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
-          Le provider réclame automatiquement 20 % de relief de base. Si tu es en taux supérieur
-          ou additionnel, le relief complémentaire se déclare dans ta Self Assessment.
+          The provider automatically claims 20% basic-rate relief. If you are a higher or
+          additional rate taxpayer, the extra relief is claimed through your Self Assessment.
         </p>
       </div>
 
       <div className="card">
-        <h2>Résumé {formatTaxYear(selectedYear)}</h2>
+        <h2>Summary {formatTaxYear(selectedYear)}</h2>
         <div className="row">
-          <span className="label">Total net versé (depuis ton compte)</span>
+          <span className="label">Total net paid (from your account)</span>
           <span className="value">£{summary.netPaid.toFixed(2)}</span>
         </div>
         <div className="row">
           <span className="label">
-            Relief de base réclamé par le provider
-            <span className="sub">20 % du brut = 25 % du net</span>
+            Basic-rate relief claimed by the provider
+            <span className="sub">20% of gross = 25% of net</span>
           </span>
           <span className="value positive">+£{summary.basicRateRelief.toFixed(2)}</span>
         </div>
         <div className="row">
           <span className="label">
-            Contribution brute (compte SIPP)
-            <span className="sub">c’est ce montant qui consomme ton plafond annuel</span>
+            Gross contribution (SIPP account)
+            <span className="sub">this is the amount that uses up your annual allowance</span>
           </span>
           <span className="big-number">£{summary.grossContributions.toFixed(2)}</span>
         </div>
@@ -158,32 +158,32 @@ export function SippView() {
         </div>
         <div className="row">
           <span className="label">
-            Plafond annuel (£{summary.effectiveAnnualAllowance.toLocaleString('en-GB')})
+            Annual allowance (£{summary.effectiveAnnualAllowance.toLocaleString('en-GB')})
             {summary.effectiveAnnualAllowance < 60000 && (
               <span className="sub">
                 {profile.mpaaTriggered
-                  ? 'MPAA déclenché (accès flexible à une pension)'
-                  : 'tapered annual allowance (revenus > £200k / £260k)'}
+                  ? 'MPAA triggered (flexible pension access)'
+                  : 'tapered annual allowance (income > £200k / £260k)'}
               </span>
             )}
             {summary.overAnnualAllowance && (
               <span className="sub" style={{ color: '#dc2626' }}>
-                ⚠ dépassé de £{Math.abs(summary.remainingAnnualAllowance).toFixed(2)} — pénalité
-                possible (annual allowance charge)
+                ⚠ over by £{Math.abs(summary.remainingAnnualAllowance).toFixed(2)} — possible
+                penalty (annual allowance charge)
               </span>
             )}
           </span>
           <span className={`value ${summary.overAnnualAllowance ? 'negative' : ''}`}>
-            £{summary.remainingAnnualAllowance.toFixed(2)} restants
+            £{summary.remainingAnnualAllowance.toFixed(2)} left
           </span>
         </div>
         <div className="row">
           <span className="label">
-            Plafond de relief (relevant UK earnings)
+            Relief cap (relevant UK earnings)
             <span className="sub">
               {profile.relevantUkEarnings > 0
-                ? '100 % de tes revenus d’emploi/auto-entreprise UK'
-                : 'aucun revenu UK d’emploi déclaré → £3,600 brut max (£2,880 net). Le loyer ne compte pas.'}
+                ? '100% of your UK employment/self-employment earnings'
+                : 'no UK earnings declared → £3,600 gross max (£2,880 net). Rental income does not count.'}
             </span>
           </span>
           <span className="value">£{summary.reliefCapGross.toLocaleString('en-GB')}</span>
@@ -193,18 +193,17 @@ export function SippView() {
         </div>
         {summary.overReliefCap && (
           <p className="ocr-status" style={{ background: '#fef2f2', color: '#dc2626', marginTop: 8 }}>
-            ⚠ £{summary.grossAboveReliefCap.toFixed(2)} brut dépasse ton plafond de relief : cette
-            part ne génère <b>aucun</b> crédit d’impôt. Règle à renseigner dans ⚙️ Réglages si tu as
-            un salaire UK.
+            ⚠ £{summary.grossAboveReliefCap.toFixed(2)} gross exceeds your relief cap: this
+            part generates <b>no</b> tax relief. Enter the rule in ⚙️ Settings if you have a UK salary.
           </p>
         )}
         <div className="row">
           <span className="label">
-            Relief complémentaire à réclamer (Self Assessment)
+            Extra relief to claim (Self Assessment)
             <span className="sub">
-              {band === 'basic' && 'aucun — taux de base'}
-              {band === 'higher' && 'taux supérieur : +20 % du brut'}
-              {band === 'additional' && 'taux additionnel : +25 % du brut'}
+              {band === 'basic' && 'none — basic rate'}
+              {band === 'higher' && 'higher rate: +20% of gross'}
+              {band === 'additional' && 'additional rate: +25% of gross'}
             </span>
           </span>
           <span className="value positive">
@@ -214,52 +213,52 @@ export function SippView() {
       </div>
 
       <div className="card">
-        <h2>Ajouter un versement</h2>
+        <h2>Add a contribution</h2>
         <label className="field">
-          Montant net versé (£)
+          Net amount paid (£)
           <input
             type="number"
             step="0.01"
             min="0"
             value={netAmount}
             onChange={(e) => setNetAmount(e.target.value)}
-            placeholder="Montant débité de ton compte"
+            placeholder="Amount debited from your account"
           />
         </label>
         <label className="field">
-          Date du versement
+          Contribution date
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <label className="field">
-          Provider (optionnel)
+          Provider (optional)
           <input
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
-            placeholder="Ex : Hargreaves Lansdown, Vanguard…"
+            placeholder="E.g. Hargreaves Lansdown, Vanguard…"
           />
         </label>
         <label className="field">
-          Note (optionnel)
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex : versement mensuel" />
+          Note (optional)
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="E.g. monthly contribution" />
         </label>
         <button className="btn" onClick={handleAdd}>
-          ➕ Ajouter le versement
+          ➕ Add contribution
         </button>
       </div>
 
       <div className="card">
-        <h2>Versements de l’année ({yearContributions.length})</h2>
+        <h2>Contributions for the year ({yearContributions.length})</h2>
         {yearContributions.length === 0 && (
-          <p className="empty-state">Aucun versement pour cette année fiscale.</p>
+          <p className="empty-state">No contributions for this tax year.</p>
         )}
         {yearContributions.map((c) => (
           <div className="row" key={c.id}>
             <span className="label">
-              {c.provider || 'Versement SIPP'}
+              {c.provider || 'SIPP contribution'}
               <span className="sub">
-                {new Date(c.date).toLocaleDateString('fr-FR')}
+                {new Date(c.date).toLocaleDateString('en-GB')}
                 {c.note ? ` · ${c.note}` : ''}
-                {' · brut £' + (c.netAmount / 0.8).toFixed(2)}
+                {' · gross £' + (c.netAmount / 0.8).toFixed(2)}
               </span>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -273,7 +272,7 @@ export function SippView() {
       </div>
 
       <div className="card">
-        <h2>Exporter</h2>
+        <h2>Export</h2>
         <div className="camera-actions">
           <button
             className="btn"
@@ -298,9 +297,9 @@ export function SippView() {
       </div>
 
       <p className="disclaimer">
-        ⚠ Le report des 3 années précédentes (carry forward) n’est pas modélisé. En cas de
-        dépassement d’un plafond, consulte un conseiller financier — une taxe (« annual allowance
-        charge ») peut s’appliquer.
+        ⚠ Carry forward of unused annual allowance from the 3 previous years is not modelled. If
+        you exceed a cap, speak to a financial adviser — a tax charge (the "annual allowance
+        charge") may apply.
       </p>
     </>
   )

@@ -24,7 +24,7 @@ export function ReceiptsView() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer ce reçu ?')) return
+    if (!confirm('Delete this receipt?')) return
     await deleteReceipt(id)
     if (selected?.id === id) setSelected(null)
     refresh()
@@ -61,24 +61,24 @@ export function ReceiptsView() {
   return (
     <>
       <div className="card">
-        <h2>📸 Reçus</h2>
+        <h2>📸 Receipts</h2>
         <div className="row">
-          <span className="label">Total des reçus enregistrés</span>
+          <span className="label">Total of saved receipts</span>
           <span className="value">£{total.toFixed(2)}</span>
         </div>
         <div className="row">
-          <span className="label">Nombre de reçus</span>
+          <span className="label">Number of receipts</span>
           <span className="value">{receipts.length}</span>
         </div>
         <button className="btn" style={{ marginTop: 12 }} onClick={() => setStage('camera')}>
-          📷 Photographier un reçu
+          📷 Photograph a receipt
         </button>
       </div>
 
       <div className="card">
-        <h2>Historique</h2>
+        <h2>History</h2>
         {receipts.length === 0 && (
-          <p className="empty-state">Aucun reçu pour le moment. Photographie ton premier reçu !</p>
+          <p className="empty-state">No receipts yet. Photograph your first receipt!</p>
         )}
         {receipts.map((r) => (
           <div
@@ -91,10 +91,10 @@ export function ReceiptsView() {
             <div className="receipt-info">
               <div className="t">{r.merchant}</div>
               <div className="d">
-                {new Date(r.date).toLocaleDateString('fr-FR')} · {getCategory(r.category).label}
+                {new Date(r.date).toLocaleDateString('en-GB')} · {getCategory(r.category).label}
               </div>
               <span className="badge">
-                {r.source === 'rental' ? '🏠 Location' : r.source === 'sipp' ? '💷 SIPP' : '📦 Autre'}
+                {r.source === 'rental' ? '🏠 Rental' : r.source === 'sipp' ? '💷 SIPP' : '📦 Other'}
               </span>
             </div>
             <span className="receipt-amount">£{r.amount.toFixed(2)}</span>
@@ -120,19 +120,19 @@ export function ReceiptsView() {
             <h2>{selected.merchant}</h2>
             <img
               src={URL.createObjectURL(selected.photo)}
-              alt="Reçu"
+              alt="Receipt"
               style={{ width: '100%', borderRadius: 12, marginBottom: 12 }}
             />
             <div className="row">
-              <span className="label">Montant</span>
+              <span className="label">Amount</span>
               <span className="value">£{selected.amount.toFixed(2)}</span>
             </div>
             <div className="row">
               <span className="label">Date</span>
-              <span className="value">{new Date(selected.date).toLocaleDateString('fr-FR')}</span>
+              <span className="value">{new Date(selected.date).toLocaleDateString('en-GB')}</span>
             </div>
             <div className="row">
-              <span className="label">Catégorie</span>
+              <span className="label">Category</span>
               <span className="value">{getCategory(selected.category).label}</span>
             </div>
             {selected.note && (
@@ -143,10 +143,10 @@ export function ReceiptsView() {
             )}
             <div className="camera-actions" style={{ marginTop: 14 }}>
               <button className="btn danger" onClick={() => handleDelete(selected.id)}>
-                🗑 Supprimer
+                🗑 Delete
               </button>
               <button className="btn secondary" onClick={() => setSelected(null)}>
-                Fermer
+                Close
               </button>
             </div>
           </div>

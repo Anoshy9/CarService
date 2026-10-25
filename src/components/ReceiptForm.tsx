@@ -42,7 +42,7 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
         if (parsed.amount !== null) setAmount(parsed.amount.toFixed(2))
         if (parsed.date) setDate(parsed.date)
       } catch {
-        if (!cancelled) setOcrError('Lecture automatique échouée — remplis les champs à la main.')
+        if (!cancelled) setOcrError('Automatic reading failed — please fill in the fields manually.')
       } finally {
         if (!cancelled) setOcrRunning(false)
       }
@@ -58,7 +58,7 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
   const handleSave = async () => {
     const parsedAmount = Number.parseFloat(amount)
     if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      alert('Merci de saisir un montant valide.')
+      alert('Please enter a valid amount.')
       return
     }
     setSaving(true)
@@ -68,7 +68,7 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
         id: newId(),
         photo: file,
         thumbnail,
-        merchant: merchant.trim() || 'Reçu sans nom',
+        merchant: merchant.trim() || 'Unnamed receipt',
         amount: Math.round(parsedAmount * 100) / 100,
         date,
         category,
@@ -80,7 +80,7 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
       onSaved()
     } catch (e) {
       console.error(e)
-      alert('Erreur lors de l’enregistrement du reçu.')
+      alert('Error while saving the receipt.')
     } finally {
       setSaving(false)
     }
@@ -88,18 +88,18 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
 
   return (
     <div className="card">
-      <h2>Nouveau reçu</h2>
-      {preview && <img className="photo-preview" src={preview} alt="Aperçu du reçu" />}
-      {ocrRunning && <p className="ocr-status">🔍 Lecture automatique du reçu en cours…</p>}
+      <h2>New receipt</h2>
+      {preview && <img className="photo-preview" src={preview} alt="Receipt preview" />}
+      {ocrRunning && <p className="ocr-status">🔍 Reading the receipt automatically…</p>}
       {ocrError && <p className="ocr-status">{ocrError}</p>}
 
       <label className="field">
-        Commerçant
-        <input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="Ex : British Gas" />
+        Merchant
+        <input value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="E.g. British Gas" />
       </label>
 
       <label className="field">
-        Montant (£)
+        Amount (£)
         <input
           type="number"
           step="0.01"
@@ -116,7 +116,7 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
       </label>
 
       <label className="field">
-        Catégorie
+        Category
         <select value={category} onChange={(e) => setCategory(e.target.value as CategoryId)}>
           {CATEGORIES.filter((c) => c.id !== 'rent').map((c) => (
             <option key={c.id} value={c.id}>
@@ -127,25 +127,25 @@ export function ReceiptForm({ file, onSaved, onCancel }: ReceiptFormProps) {
       </label>
 
       <label className="field">
-        Usage
+        Purpose
         <select value={source} onChange={(e) => setSource(e.target.value as Source)}>
-          <option value="rental">🏠 Location (déclaration foncière)</option>
-          <option value="sipp">💷 SIPP (retraite)</option>
-          <option value="other">📦 Autre</option>
+          <option value="rental">🏠 Rental (property income return)</option>
+          <option value="sipp">💷 SIPP (pension)</option>
+          <option value="other">📦 Other</option>
         </select>
       </label>
 
       <label className="field">
-        Note (optionnel)
-        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex : facture janvier" />
+        Note (optional)
+        <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="E.g. January bill" />
       </label>
 
       <div className="camera-actions">
         <button className="btn" onClick={handleSave} disabled={saving || ocrRunning}>
-          {saving ? 'Enregistrement…' : '💾 Enregistrer le reçu'}
+          {saving ? 'Saving…' : '💾 Save receipt'}
         </button>
         <button className="btn secondary" onClick={onCancel}>
-          Annuler
+          Cancel
         </button>
       </div>
     </div>

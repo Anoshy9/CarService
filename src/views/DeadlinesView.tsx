@@ -18,9 +18,9 @@ import {
 import { summariseRental } from '../lib/rental'
 
 const STATUS_LABEL: Record<DeadlineWithStatus['status'], string> = {
-  overdue: 'En retard',
-  upcoming: 'À venir',
-  done: 'Fait',
+  overdue: 'Overdue',
+  upcoming: 'Upcoming',
+  done: 'Done',
 }
 
 const STATUS_CLASS: Record<DeadlineWithStatus['status'], string> = {
@@ -70,21 +70,20 @@ export function DeadlinesView() {
   return (
     <>
       <div className="card">
-        <h2>📅 Échéances HMRC — {formatTaxYear(taxYear)}</h2>
+        <h2>📅 HMRC deadlines — {formatTaxYear(taxYear)}</h2>
         <p style={{ fontSize: 13, color: '#64748b' }}>
-          du 6 avril {taxYear.label - 1} au 5 avril {taxYear.label}. Coche chaque échéance au fur et
-          à mesure.
+          6 April {taxYear.label - 1} to 5 April {taxYear.label}. Tick each deadline off as you go.
         </p>
         {mtd && (
           <p className="ocr-status" style={{ background: '#eff6ff', color: '#1d4ed8', marginTop: 8 }}>
-            ℹ️ Making Tax Digital (MTD) s’applique à toi pour cette année (revenus bruts &gt; seuil) :
-            mises à jour trimestrielles obligatoires en plus de la déclaration finale.
+            ℹ️ Making Tax Digital (MTD) applies to you this tax year (gross income above the
+            threshold): quarterly updates are mandatory, in addition to the final declaration.
           </p>
         )}
       </div>
 
       <div className="card">
-        <h2>Calendrier</h2>
+        <h2>Calendar</h2>
         {deadlines.map((d) => (
           <div
             className="row"
@@ -95,7 +94,7 @@ export function DeadlinesView() {
             <span className="label">
               {d.label}
               <span className="sub">
-                {new Date(d.date + 'T12:00:00').toLocaleDateString('fr-FR', {
+                {new Date(d.date + 'T12:00:00').toLocaleDateString('en-GB', {
                   day: 'numeric',
                   month: 'long',
                   year: 'numeric',
@@ -106,7 +105,7 @@ export function DeadlinesView() {
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {d.status === 'upcoming' && d.daysUntil <= 30 && (
-                <span className="badge warn">J-{d.daysUntil}</span>
+                <span className="badge warn">D-{d.daysUntil}</span>
               )}
               <span className={STATUS_CLASS[d.status]}>{STATUS_LABEL[d.status]}</span>
               <input type="checkbox" checked={d.status === 'done'} readOnly />
@@ -116,37 +115,37 @@ export function DeadlinesView() {
       </div>
 
       <div className="card">
-        <h2>💷 Paiements sur compte (payments on account)</h2>
+        <h2>💷 Payments on account</h2>
         <p style={{ fontSize: 13, color: '#64748b' }}>
-          Si ta facture d’impôt dépasse £1,000 et que moins de 80 % est prélevé à la source, HMRC
-          demande deux acomptes de 50 % de l’impôt de l’année précédente : le 31 janvier et le
-          31 juillet suivant la fin de l’année fiscale. Ils sont déduits du solde final.
+          If your tax bill exceeds £1,000 and less than 80% is collected at source, HMRC asks for
+          two advance payments of 50% of the previous year's bill: on 31 January and 31 July after
+          the end of the tax year. They are deducted from the final balancing payment.
         </p>
       </div>
 
       <div className="card">
-        <h2>⚠️ Pénalités en cas de retard</h2>
+        <h2>⚠️ Late penalties</h2>
         <div className="row">
-          <span className="label">Déclaration en retard</span>
-          <span className="value">£100 dès le 1er jour</span>
+          <span className="label">Late filing</span>
+          <span className="value">£100 from day 1</span>
         </div>
         <div className="row">
-          <span className="label">Après 3 mois</span>
-          <span className="value">£10/jour (max £900)</span>
+          <span className="label">After 3 months</span>
+          <span className="value">£10/day (max £900)</span>
         </div>
         <div className="row">
-          <span className="label">Après 6 / 12 mois</span>
-          <span className="value">5 % de l’impôt ou £300</span>
+          <span className="label">After 6 / 12 months</span>
+          <span className="value">5% of tax or £300</span>
         </div>
         <div className="row">
-          <span className="label">Paiement en retard</span>
-          <span className="value">5 % à 30 j, 6 et 12 mois + intérêts</span>
+          <span className="label">Late payment</span>
+          <span className="value">5% at 30 days, 6 and 12 months + interest</span>
         </div>
       </div>
 
       <p className="disclaimer">
-        ⚠️ Calendrier indicatif pour un résident UK avec revenus locatifs uniquement. Les règles MTD
-        évoluent : vérifie sur gov.uk avant chaque échéance.
+        ⚠️ Indicative calendar for a UK resident whose only income is rental income. MTD rules are
+        evolving — check gov.uk before each deadline.
       </p>
     </>
   )

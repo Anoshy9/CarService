@@ -30,7 +30,7 @@ export function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
         await videoRef.current.play()
       }
     } catch {
-      setError('Caméra indisponible — choisis une photo dans ta galerie à la place.')
+      setError('Camera unavailable — pick a photo from your gallery instead.')
     }
   }
 
@@ -77,14 +77,14 @@ export function CameraCapture({ onCapture, onCancel }: CameraCaptureProps) {
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="camera-actions">
           <button className="btn" onClick={streamRef.current ? takePhoto : startCamera}>
-            {streamRef.current ? '📸 Prendre la photo' : '📷 Ouvrir la caméra'}
+            {streamRef.current ? '📸 Take the photo' : '📷 Open camera'}
           </button>
           <button className="btn secondary" onClick={() => fileInputRef.current?.click()}>
-            🖼 Galerie
+            🖼 Gallery
           </button>
         </div>
         <button className="btn secondary" onClick={handleClose}>
-          Annuler
+          Cancel
         </button>
         <input
           ref={fileInputRef}

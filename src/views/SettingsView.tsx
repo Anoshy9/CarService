@@ -35,7 +35,7 @@ export function SettingsView() {
     await update({ sippProfile: { ...settings.sippProfile, ...patch } })
   }
 
-  if (!settings) return <div className="card"><p className="empty-state">Chargement…</p></div>
+  if (!settings) return <div className="card"><p className="empty-state">Loading…</p></div>
 
   const profile = settings.sippProfile
   const allowance = effectiveAnnualAllowance(profile)
@@ -44,92 +44,94 @@ export function SettingsView() {
   return (
     <>
       <div className="card">
-        <h2>⚙️ Profil fiscal</h2>
+        <h2>⚙️ Tax profile</h2>
         <p style={{ fontSize: 13, color: '#64748b' }}>
-          Ces informations calibrent le calcul de l’impôt estimé et les plafonds SIPP pour l’année
-          fiscale {formatTaxYear(taxYear)}.
+          This information calibrates the estimated tax and the SIPP limits for tax year{' '}
+          {formatTaxYear(taxYear)}.
         </p>
         <div className="row">
           <span className="label">
-            Résidence fiscale
-            <span className="sub">Tu as indiqué être résident au Royaume-Uni (pas de régime NRLS).</span>
+            Tax residence
+            <span className="sub">You indicated you are UK tax resident (the NRLS scheme does not apply).</span>
           </span>
           <span className="badge">UK resident</span>
         </div>
         <label className="field">
-          Revenus « relevant UK earnings » (£/an)
+          Relevant UK earnings (£/year)
           <input
             type="number"
             min="0"
             step="100"
             value={profile.relevantUkEarnings || ''}
-            placeholder="0 si tu n'as que des revenus locatifs"
+            placeholder="0 if your only income is rent"
             onChange={(e) =>
               updateProfile({ relevantUkEarnings: Number.parseFloat(e.target.value) || 0 })
             }
           />
           <span className="sub">
-            Salaire ou bénéfices d’auto-entreprise UK uniquement. <b>Le revenu locatif ne compte pas.</b>
+            Salary or self-employment profits from the UK only. <b>Rental income does NOT count.</b>
           </span>
         </label>
         <div className="row" onClick={() => updateProfile({ mpaaTriggered: !profile.mpaaTriggered })} style={{ cursor: 'pointer' }}>
           <span className="label">
-            Accès flexible à une pension (MPAA)
+            Flexible pension access (MPAA)
             <span className="sub">
-              Coche si tu as déjà pris un revenu flexible (drawdown) ou un versement UFPLS. Le lump sum
-              25 % seul ne déclenche pas le MPAA.
+              Tick if you have already taken a flexible income (drawdown) or an UFPLS. Taking only the
+              25% tax-free lump sum does NOT trigger the MPAA.
             </span>
           </span>
           <input type="checkbox" checked={profile.mpaaTriggered} readOnly />
         </div>
         <label className="field">
-          Threshold income (£/an)
+          Threshold income (£/year)
           <input
             type="number"
             min="0"
             step="1000"
             value={profile.thresholdIncome || ''}
-            placeholder="Revenu imposable total moins tes contributions retraite"
+            placeholder="Total taxable income minus your pension contributions"
             onChange={(e) =>
               updateProfile({ thresholdIncome: Number.parseFloat(e.target.value) || 0 })
             }
           />
-          <span className="sub">Taper si &gt; £{TAPER_THRESHOLD_INCOME.toLocaleString('en-GB')}.</span>
+          <span className="sub">Taper applies if above £{TAPER_THRESHOLD_INCOME.toLocaleString('en-GB')}.</span>
         </label>
         <label className="field">
-          Adjusted income (£/an)
+          Adjusted income (£/year)
           <input
             type="number"
             min="0"
             step="1000"
             value={profile.adjustedIncome || ''}
-            placeholder="Revenu imposable total plus toutes les contributions retraite"
+            placeholder="Total taxable income plus all pension contributions"
             onChange={(e) =>
               updateProfile({ adjustedIncome: Number.parseFloat(e.target.value) || 0 })
             }
           />
-          <span className="sub">Taper si &gt; £{TAPER_ADJUSTED_INCOME.toLocaleString('en-GB')} (les deux seuils doivent être dépassés).</span>
+          <span className="sub">
+            Taper applies if above £{TAPER_ADJUSTED_INCOME.toLocaleString('en-GB')} (both thresholds must be exceeded).
+          </span>
         </label>
         <label className="field">
-          Autre revenu imposable (£/an)
+          Other taxable income (£/year)
           <input
             type="number"
             min="0"
             step="100"
             value={settings.otherTaxableIncome || ''}
-            placeholder="Salaire, dividendes, etc. hors location"
+            placeholder="Salary, dividends, etc. outside rental income"
             onChange={(e) =>
               update({ otherTaxableIncome: Number.parseFloat(e.target.value) || 0 })
             }
           />
-          <span className="sub">Utilisé uniquement pour l’estimation de l’impôt total.</span>
+          <span className="sub">Used only for the overall tax estimate.</span>
         </label>
         <div className="row" onClick={() => update({ usePropertyAllowance: !settings.usePropertyAllowance })} style={{ cursor: 'pointer' }}>
           <span className="label">
-            Abattement forfaitaire « property allowance » (£1,000)
+            £1,000 flat-rate property allowance
             <span className="sub">
-              Remplace toutes les dépenses déductibles (y compris le crédit sur les intérêts). À
-              n’utiliser que si tes frais réels sont inférieurs à £1,000.
+              Replaces all deductible expenses (including the interest credit). Only worth using if your
+              actual expenses are below £1,000.
             </span>
           </span>
           <input type="checkbox" checked={settings.usePropertyAllowance} readOnly />
@@ -137,27 +139,27 @@ export function SettingsView() {
       </div>
 
       <div className="card">
-        <h2>📋 Ce que ça change pour toi</h2>
+        <h2>📋 What this changes for you</h2>
         <div className="row">
           <span className="label">
-            Plafond de relief SIPP (règle des relevant UK earnings)
+            SIPP relief cap (relevant UK earnings rule)
             <span className="sub">
               {profile.relevantUkEarnings > 0
-                ? '100 % de tes revenus d’emploi/auto-entreprise UK.'
-                : `Sans revenu d’emploi UK, le maximum avec relief est £${NON_EARNER_LIMIT_GROSS.toLocaleString('en-GB')} brut (£2,880 net). Le loyer ne compte pas.`}
+                ? '100% of your UK employment/self-employment earnings.'
+                : `No UK employment income: the maximum with tax relief is £${NON_EARNER_LIMIT_GROSS.toLocaleString('en-GB')} gross (£2,880 net). Rent does not count.`}
             </span>
           </span>
-          <span className="value">£{reliefCap.toLocaleString('en-GB')} brut</span>
+          <span className="value">£{reliefCap.toLocaleString('en-GB')} gross</span>
         </div>
         <div className="row">
           <span className="label">
-            Plafond annuel SIPP (annual allowance)
+            SIPP annual allowance
             <span className="sub">
               {profile.mpaaTriggered
-                ? `MPAA déclenché : plafond ramené à £${MPAA_GROSS.toLocaleString('en-GB')}.`
+                ? `MPAA triggered: allowance reduced to £${MPAA_GROSS.toLocaleString('en-GB')} (no carry forward).`
                 : allowance < ANNUAL_ALLOWANCE_GROSS
-                  ? `Tapered annual allowance appliqué (revenus élevés).`
-                  : 'Plafond standard 2025/26 (report possible sur 3 ans).'}
+                  ? `Tapered annual allowance applies (high income).`
+                  : 'Standard allowance for the year (unused amounts can be carried forward 3 years).'}
             </span>
           </span>
           <span className="value">£{allowance.toLocaleString('en-GB')}</span>
@@ -165,9 +167,8 @@ export function SettingsView() {
       </div>
 
       <p className="disclaimer">
-        ⚠️ Ces réglages servent à des estimations. Vérifie ton statut de résidence (Statutory
-        Residence Test) et consulte un comptable pour les cas limites (split year, non-résidence,
-        revenus étrangers).
+        ⚠️ These settings drive estimates only. Check your residence status (Statutory Residence Test)
+        and speak to an accountant for edge cases (split year, non-residence, foreign income).
       </p>
     </>
   )
