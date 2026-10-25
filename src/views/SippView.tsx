@@ -2,15 +2,16 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   addSippContribution,
   deleteSippContribution,
-  getSettings,
+  getSettingsMigrated,
   listSippContributions,
   newId,
   saveSettings,
+  type SettingsRecord,
   type SippRecord,
 } from '../db/database'
 import {
-  ANNUAL_ALLOWANCE_GROSS,
   summariseSipp,
+  type SippProfile,
   type TaxBand,
 } from '../lib/sipp'
 import { isInTaxYear, listRecentTaxYears, parseISODate, toISODate, formatTaxYear, type TaxYear } from '../lib/taxYear'
@@ -27,6 +28,13 @@ export function SippView() {
   const [selectedYear, setSelectedYear] = useState<TaxYear>(() => years[years.length - 1])
   const [contributions, setContributions] = useState<SippRecord[]>([])
   const [band, setBand] = useState<TaxBand>('basic')
+  const [profile, setProfile] = useState<SippProfile>({
+    relevantUkEarnings: 0,
+    mpaaTriggered: false,
+    thresholdIncome: 0,
+    adjustedIncome: 0,
+  })
+  const [settings, setSettings] = useState<SettingsRecord | null>(null)
 
   const [netAmount, setNetAmount] = useState('')
   const [date, setDate] = useState(toISODate(new Date()))
@@ -37,19 +45,22 @@ export function SippView() {
 
   useEffect(() => {
     refresh()
-    getSettings().then((s) => setBand(s.taxBand))
+    getSettingsMigrated().then((s) => {
+      setSettings(s)
+      setBand(s.taxBand)
+      setProfile(s.sippProfile)
+    })
   }, [])
 
   const handleBandChange = async (newBand: TaxBand) => {
     setBand(newBand)
-    const settings = await getSettings()
-    await saveSettings({ ...settings, taxBand: newBand })
+    if (settings) await saveSettings({ ...settings, taxBand: newBand })
   }
 
   const yearContributions = contributions.filter((c) =>
     isInTaxYear(parseISODate(c.date), selectedYear),
   )
-  const summary = summariseSipp(yearContributions, band)
+  const summary = summariseSipp(yearContributions, band, profile)
 
   const moveYear = (delta: number) => {
     const idx = years.findIndex((y) => y.label === selectedYear.label)
@@ -84,7 +95,11 @@ export function SippView() {
 
   const allowancePct = Math.min(
     100,
-    (summary.grossContributions / ANNUAL_ALLOWANCE_GROSS) * 100,
+    (summary.grossContributions / summary.effectiveAnnualAllowance) * 100,
+  )
+  const reliefCapPct = Math.min(
+    100,
+    (summary.grossContributions / summary.reliefCapGross) * 100,
   )
 
   return (
@@ -143,7 +158,14 @@ export function SippView() {
         </div>
         <div className="row">
           <span className="label">
-            Plafond annuel (£{ANNUAL_ALLOWANCE_GROSS.toLocaleString('en-GB')})
+            Plafond annuel (£{summary.effectiveAnnualAllowance.toLocaleString('en-GB')})
+            {summary.effectiveAnnualAllowance < 60000 && (
+              <span className="sub">
+                {profile.mpaaTriggered
+                  ? 'MPAA déclenché (accès flexible à une pension)'
+                  : 'tapered annual allowance (revenus > £200k / £260k)'}
+              </span>
+            )}
             {summary.overAnnualAllowance && (
               <span className="sub" style={{ color: '#dc2626' }}>
                 ⚠ dépassé de £{Math.abs(summary.remainingAnnualAllowance).toFixed(2)} — pénalité
@@ -155,6 +177,27 @@ export function SippView() {
             £{summary.remainingAnnualAllowance.toFixed(2)} restants
           </span>
         </div>
+        <div className="row">
+          <span className="label">
+            Plafond de relief (relevant UK earnings)
+            <span className="sub">
+              {profile.relevantUkEarnings > 0
+                ? '100 % de tes revenus d’emploi/auto-entreprise UK'
+                : 'aucun revenu UK d’emploi déclaré → £3,600 brut max (£2,880 net). Le loyer ne compte pas.'}
+            </span>
+          </span>
+          <span className="value">£{summary.reliefCapGross.toLocaleString('en-GB')}</span>
+        </div>
+        <div className="progress">
+          <div style={{ width: `${reliefCapPct}%`, background: summary.overReliefCap ? '#dc2626' : '#16a34a' }} />
+        </div>
+        {summary.overReliefCap && (
+          <p className="ocr-status" style={{ background: '#fef2f2', color: '#dc2626', marginTop: 8 }}>
+            ⚠ £{summary.grossAboveReliefCap.toFixed(2)} brut dépasse ton plafond de relief : cette
+            part ne génère <b>aucun</b> crédit d’impôt. Règle à renseigner dans ⚙️ Réglages si tu as
+            un salaire UK.
+          </p>
+        )}
         <div className="row">
           <span className="label">
             Relief complémentaire à réclamer (Self Assessment)
@@ -236,18 +279,18 @@ export function SippView() {
             className="btn"
             onClick={() =>
               downloadBlob(
-                new Blob([sippCsv(yearContributions, band, selectedYear)], {
+                new Blob([sippCsv(yearContributions, band, selectedYear, profile)], {
                   type: 'text/csv;charset=utf-8',
                 }),
                 `taxtrack-sipp-${formatTaxYear(selectedYear).replace('/', '-')}.csv`,
               )
             }
           >
-            ⬇️ Export CSV
+            ⬆️ Export CSV
           </button>
           <button
             className="btn secondary"
-            onClick={() => exportSippPdf(yearContributions, band, selectedYear)}
+            onClick={() => exportSippPdf(yearContributions, band, selectedYear, profile)}
           >
             📄 Export PDF
           </button>
@@ -255,9 +298,9 @@ export function SippView() {
       </div>
 
       <p className="disclaimer">
-        ⚠️ Le plafond annuel de £60,000 (brut) et le report des 3 années précédentes ne sont pas
-        modélisés en détail. En cas de dépassement, consulte un conseiller financier — une taxe
-        (« annual allowance charge ») peut s’appliquer.
+        ⚠ Le report des 3 années précédentes (carry forward) n’est pas modélisé. En cas de
+        dépassement d’un plafond, consulte un conseiller financier — une taxe (« annual allowance
+        charge ») peut s’appliquer.
       </p>
     </>
   )

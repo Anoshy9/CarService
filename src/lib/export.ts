@@ -2,8 +2,8 @@ import type { TaxYear } from './taxYear'
 import { formatTaxYear } from './taxYear'
 import type { ReceiptRecord, RentalRecord, SippRecord } from '../db/database'
 import { getCategory } from './categories'
-import { summariseSipp, type TaxBand } from './sipp'
-import { summariseRental, type RentalEntry } from './rental'
+import { DEFAULT_SIPP_PROFILE, summariseSipp, type SippProfile, type TaxBand } from './sipp'
+import { summariseRental, type RentalEntry, type RentalOptions } from './rental'
 
 function escapeCsv(value: string): string {
   if (/[",\n]/.test(value)) return `"${value.replace(/"/g, '""')}"`
@@ -14,7 +14,11 @@ function toCsv(rows: string[][]): string {
   return rows.map((r) => r.map(escapeCsv).join(',')).join('\n')
 }
 
-export function rentalCsv(entries: RentalRecord[], _taxYear: TaxYear): string {
+export function rentalCsv(
+  entries: RentalRecord[],
+  _taxYear: TaxYear,
+  options: RentalOptions = {},
+): string {
   const rows: string[][] = [
     ['Catégorie', 'Libellé', 'Montant (£)', 'Date', 'Note'],
     ...entries.map((e) => [
@@ -25,16 +29,32 @@ export function rentalCsv(entries: RentalRecord[], _taxYear: TaxYear): string {
       e.note ?? '',
     ]),
   ]
-  const summary = summariseRental(entries as RentalEntry[])
+  const summary = summariseRental(entries as RentalEntry[], options)
   rows.push([], ['Résumé', '', '', '', ''])
   rows.push(['Revenus locatifs', '', summary.income.toFixed(2), '', ''])
   rows.push(['Frais déductibles', '', summary.deductibleExpenses.toFixed(2), '', ''])
+  rows.push(['Dépenses en capital (améliorations, non déductibles)', '', summary.capitalExpenditure.toFixed(2), '', ''])
   rows.push(['Crédit d’impôt intérêts (20 %)', '', summary.financeCostCredit.toFixed(2), '', ''])
-  rows.push(['Bénéfice imposable', '', summary.taxableProfit.toFixed(2), '', ''])
+  rows.push([
+    summary.propertyAllowanceExempt
+      ? 'Exonéré (property allowance £1,000)'
+      : summary.propertyAllowanceElected
+        ? 'Property allowance £1,000 choisie'
+        : 'Bénéfice imposable (frais réels)',
+    '',
+    summary.taxableProfit.toFixed(2),
+    '',
+    '',
+  ])
   return toCsv(rows)
 }
 
-export function sippCsv(contributions: SippRecord[], band: TaxBand, _taxYear: TaxYear): string {
+export function sippCsv(
+  contributions: SippRecord[],
+  band: TaxBand,
+  _taxYear: TaxYear,
+  profile: SippProfile = DEFAULT_SIPP_PROFILE,
+): string {
   const rows: string[][] = [
     ['Date', 'Montant net versé (£)', 'Relief de base 20 % (£)', 'Contribution brute (£)', 'Fournisseur', 'Note'],
     ...contributions.map((c) => {
@@ -50,7 +70,7 @@ export function sippCsv(contributions: SippRecord[], band: TaxBand, _taxYear: Ta
       ]
     }),
   ]
-  const summary = summariseSipp(contributions, band)
+  const summary = summariseSipp(contributions, band, profile)
   rows.push([], ['Résumé', '', '', '', '', ''])
   rows.push(['Total net versé', summary.netPaid.toFixed(2), '', '', '', ''])
   rows.push(['Total brut (net + relief de base)', '', '', summary.grossContributions.toFixed(2), '', ''])
@@ -62,7 +82,10 @@ export function sippCsv(contributions: SippRecord[], band: TaxBand, _taxYear: Ta
     '',
     '',
   ])
+  rows.push(['Plafond annuel effectif', '', '', summary.effectiveAnnualAllowance.toFixed(2), '', ''])
   rows.push(['Plafond annuel restant', '', '', summary.remainingAnnualAllowance.toFixed(2), '', ''])
+  rows.push(['Plafond de relief (relevant UK earnings)', '', '', summary.reliefCapGross.toFixed(2), '', ''])
+  rows.push(['Brut au-dessus du plafond de relief (sans relief)', '', '', summary.grossAboveReliefCap.toFixed(2), '', ''])
   return toCsv(rows)
 }
 
@@ -147,8 +170,12 @@ export function downloadBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 5000)
 }
 
-export function exportRentalPdf(entries: RentalRecord[], taxYear: TaxYear): void {
-  const summary = summariseRental(entries as RentalEntry[])
+export function exportRentalPdf(
+  entries: RentalRecord[],
+  taxYear: TaxYear,
+  options: RentalOptions = {},
+): void {
+  const summary = summariseRental(entries as RentalEntry[], options)
   const lines = entries.map(
     (e) =>
       `${e.date}  ${getCategory(e.category).label.padEnd(24)} ${e.amount
@@ -158,6 +185,7 @@ export function exportRentalPdf(entries: RentalRecord[], taxYear: TaxYear): void
   lines.push('----------------------------------------')
   lines.push(`Revenus locatifs        ${summary.income.toFixed(2).padStart(10)} GBP`)
   lines.push(`Frais deductibles       ${summary.deductibleExpenses.toFixed(2).padStart(10)} GBP`)
+  lines.push(`Capital (ameliorations) ${summary.capitalExpenditure.toFixed(2).padStart(10)} GBP`)
   lines.push(`Credit impot interets   ${summary.financeCostCredit.toFixed(2).padStart(10)} GBP`)
   lines.push(`Benefice imposable      ${summary.taxableProfit.toFixed(2).padStart(10)} GBP`)
   downloadBlob(
@@ -166,8 +194,13 @@ export function exportRentalPdf(entries: RentalRecord[], taxYear: TaxYear): void
   )
 }
 
-export function exportSippPdf(contributions: SippRecord[], band: TaxBand, taxYear: TaxYear): void {
-  const summary = summariseSipp(contributions, band)
+export function exportSippPdf(
+  contributions: SippRecord[],
+  band: TaxBand,
+  taxYear: TaxYear,
+  profile: SippProfile = DEFAULT_SIPP_PROFILE,
+): void {
+  const summary = summariseSipp(contributions, band, profile)
   const lines = contributions.map((c) => {
     const gross = Math.round((c.netAmount / 0.8) * 100) / 100
     return `${c.date}  net ${c.netAmount.toFixed(2).padStart(10)} GBP   brut ${gross
@@ -183,7 +216,10 @@ export function exportSippPdf(contributions: SippRecord[], band: TaxBand, taxYea
       .toFixed(2)
       .padStart(10)} GBP`,
   )
+  lines.push(`Plafond annuel effectif  ${summary.effectiveAnnualAllowance.toFixed(2).padStart(10)} GBP`)
   lines.push(`Plafond annuel restant   ${summary.remainingAnnualAllowance.toFixed(2).padStart(10)} GBP`)
+  lines.push(`Plafond relief (earnings)${summary.reliefCapGross.toFixed(2).padStart(10)} GBP`)
+  lines.push(`Brut hors plafond relief ${summary.grossAboveReliefCap.toFixed(2).padStart(10)} GBP`)
   downloadBlob(
     simplePdf(`TaxTrack UK - SIPP - annee fiscale ${formatTaxYear(taxYear)}`, lines),
     `taxtrack-sipp-${formatTaxYear(taxYear).replace('/', '-')}.pdf`,

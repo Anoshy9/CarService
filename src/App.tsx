@@ -3,14 +3,18 @@ import { DashboardView } from './views/DashboardView'
 import { ReceiptsView } from './views/ReceiptsView'
 import { RentalView } from './views/RentalView'
 import { SippView } from './views/SippView'
+import { DeadlinesView } from './views/DeadlinesView'
+import { SettingsView } from './views/SettingsView'
 
-type Tab = 'dashboard' | 'receipts' | 'rental' | 'sipp'
+type Tab = 'dashboard' | 'receipts' | 'rental' | 'sipp' | 'deadlines' | 'settings'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'dashboard', label: 'Accueil', icon: '📊' },
   { id: 'receipts', label: 'Reçus', icon: '📸' },
   { id: 'rental', label: 'Location', icon: '🏠' },
   { id: 'sipp', label: 'SIPP', icon: '💷' },
+  { id: 'deadlines', label: 'Échéances', icon: '📅' },
+  { id: 'settings', label: 'Réglages', icon: '⚙️' },
 ]
 
 export default function App() {
@@ -38,6 +42,8 @@ export default function App() {
         {tab === 'receipts' && <ReceiptsView />}
         {tab === 'rental' && <RentalView />}
         {tab === 'sipp' && <SippView />}
+        {tab === 'deadlines' && <DeadlinesView />}
+        {tab === 'settings' && <SettingsView />}
       </main>
     </>
   )

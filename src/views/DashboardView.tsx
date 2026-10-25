@@ -6,18 +6,20 @@ import {
   type ReceiptRecord,
   type RentalRecord,
   type SippRecord,
-  getSettings,
+  getSettingsMigrated,
+  type SettingsRecord,
 } from '../db/database'
 import { getTaxYear, formatTaxYear, isInTaxYear, parseISODate } from '../lib/taxYear'
 import { summariseRental } from '../lib/rental'
 import { summariseSipp } from '../lib/sipp'
+import { calculateIncomeTax } from '../lib/incomeTax'
 import { downloadBlob, receiptsCsv, rentalCsv, sippCsv, exportRentalPdf, exportSippPdf } from '../lib/export'
 
 export function DashboardView() {
   const [receipts, setReceipts] = useState<ReceiptRecord[]>([])
   const [rental, setRental] = useState<RentalRecord[]>([])
   const [sipp, setSipp] = useState<SippRecord[]>([])
-  const [band, setBand] = useState<'basic' | 'higher' | 'additional'>('basic')
+  const [settings, setSettings] = useState<SettingsRecord | null>(null)
 
   const taxYear = useMemo(() => getTaxYear(), [])
 
@@ -25,7 +27,7 @@ export function DashboardView() {
     listReceipts().then(setReceipts)
     listRentalEntries().then(setRental)
     listSippContributions().then(setSipp)
-    getSettings().then((s) => setBand(s.taxBand))
+    getSettingsMigrated().then(setSettings)
   }, [])
 
   const inYear = <T extends { date: string }>(items: T[]) =>
@@ -35,8 +37,19 @@ export function DashboardView() {
   const yearRental = inYear(rental)
   const yearSipp = inYear(sipp)
 
-  const rentalSummary = summariseRental(yearRental)
-  const sippSummary = summariseSipp(yearSipp, band)
+  const band = settings?.taxBand ?? 'basic'
+  const rentalSummary = summariseRental(yearRental, {
+    usePropertyAllowance: settings?.usePropertyAllowance,
+  })
+  const sippSummary = summariseSipp(yearSipp, band, settings?.sippProfile)
+
+  const taxEstimate = useMemo(() => {
+    if (!settings) return null
+    return calculateIncomeTax({
+      taxableIncome: rentalSummary.taxableProfit + settings.otherTaxableIncome,
+      financeCosts: rentalSummary.financeCosts,
+    })
+  }, [rentalSummary, settings])
 
   const totalExpenses = yearReceipts
     .filter((r) => r.source === 'rental')
@@ -50,10 +63,10 @@ export function DashboardView() {
       receiptsCsv(yearReceipts),
       '',
       '## Location',
-      rentalCsv(yearRental, taxYear),
+      rentalCsv(yearRental, taxYear, { usePropertyAllowance: settings?.usePropertyAllowance }),
       '',
       '## SIPP',
-      sippCsv(yearSipp, band, taxYear),
+      sippCsv(yearSipp, band, taxYear, settings?.sippProfile),
     ]
     downloadBlob(
       new Blob([parts.join('\n')], { type: 'text/csv;charset=utf-8' }),
@@ -76,14 +89,36 @@ export function DashboardView() {
           <span className="label">Revenus locatifs</span>
           <span className="value positive">£{rentalSummary.income.toFixed(2)}</span>
         </div>
-        <div className="row">
-          <span className="label">Frais déductibles</span>
-          <span className="value negative">−£{rentalSummary.deductibleExpenses.toFixed(2)}</span>
-        </div>
+        {rentalSummary.propertyAllowanceExempt && (
+          <p className="ocr-status" style={{ background: '#f0fdf4', color: '#15803d', marginTop: 8 }}>
+            ✅ Revenus ≤ £1,000 : exonérés via la property allowance, rien à déclarer pour la location.
+          </p>
+        )}
+        {rentalSummary.propertyAllowanceElected && (
+          <p className="ocr-status" style={{ background: '#eff6ff', color: '#1d4ed8', marginTop: 8 }}>
+            ℹ️ Property allowance £1,000 choisie : bénéfice = revenus − £1,000, aucun frais ni crédit
+            d’intérêt déclaré.
+          </p>
+        )}
+        {!rentalSummary.propertyAllowanceExempt && !rentalSummary.propertyAllowanceElected && (
+          <div className="row">
+            <span className="label">Frais déductibles</span>
+            <span className="value negative">−£{rentalSummary.deductibleExpenses.toFixed(2)}</span>
+          </div>
+        )}
+        {rentalSummary.capitalExpenditure > 0 && (
+          <div className="row">
+            <span className="label">
+              Améliorations (capital, non déductibles)
+              <span className="sub">conservées pour le calcul du CGT en cas de vente</span>
+            </span>
+            <span className="value">£{rentalSummary.capitalExpenditure.toFixed(2)}</span>
+          </div>
+        )}
         <div className="row">
           <span className="label">Bénéfice imposable</span>
-          <span className={`value ${rentalSummary.profit >= 0 ? 'positive' : 'negative'}`}>
-            £{rentalSummary.profit.toFixed(2)}
+          <span className={`value ${rentalSummary.taxableProfit >= 0 ? 'positive' : 'negative'}`}>
+            £{rentalSummary.taxableProfit.toFixed(2)}
           </span>
         </div>
         {rentalSummary.financeCostCredit > 0 && (
@@ -95,11 +130,45 @@ export function DashboardView() {
         <button
           className="btn secondary"
           style={{ marginTop: 10 }}
-          onClick={() => exportRentalPdf(yearRental, taxYear)}
+          onClick={() =>
+            exportRentalPdf(yearRental, taxYear, {
+              usePropertyAllowance: settings?.usePropertyAllowance,
+            })
+          }
         >
           📄 Export PDF location
         </button>
       </div>
+
+      {taxEstimate && (
+        <div className="card">
+          <h2>🧾 Impôt estimé (2025/26, Angleterre)</h2>
+          <div className="row">
+            <span className="label">
+              Abattement personnel
+              <span className="sub">£12,570, réduit au-delà de £100,000 de revenu</span>
+            </span>
+            <span className="value">£{taxEstimate.personalAllowance.toFixed(2)}</span>
+          </div>
+          <div className="row">
+            <span className="label">Impôt sur le revenu (tranches 20/40/45 %)</span>
+            <span className="value">£{taxEstimate.taxOnIncome.toFixed(2)}</span>
+          </div>
+          {taxEstimate.financeCostCredit > 0 && (
+            <div className="row">
+              <span className="label">Crédit Section 24 (intérêts)</span>
+              <span className="value positive">−£{taxEstimate.financeCostCredit.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="row">
+            <span className="label">
+              <b>Impôt estimé à payer</b>
+              <span className="sub">hors acomptes déjà versés, hors autres revenus non saisis</span>
+            </span>
+            <span className="big-number">£{taxEstimate.taxDue.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <h2>💷 SIPP</h2>
@@ -108,7 +177,9 @@ export function DashboardView() {
           <span className="value">£{sippSummary.netPaid.toFixed(2)}</span>
         </div>
         <div className="row">
-          <span className="label">Contribution brute (plafond £60,000)</span>
+          <span className="label">
+            Contribution brute (plafond £{sippSummary.effectiveAnnualAllowance.toLocaleString('en-GB')})
+          </span>
           <span className="value">£{sippSummary.grossContributions.toFixed(2)}</span>
         </div>
         <div className="row">
@@ -122,10 +193,17 @@ export function DashboardView() {
             ⚠ Plafond annuel dépassé de £{Math.abs(sippSummary.remainingAnnualAllowance).toFixed(2)}
           </p>
         )}
+        {sippSummary.overReliefCap && (
+          <p className="ocr-status" style={{ background: '#fef2f2', color: '#dc2626', marginTop: 8 }}>
+            ⚠ £{sippSummary.grossAboveReliefCap.toFixed(2)} brut au-dessus de ton plafond de relief
+            (£{sippSummary.reliefCapGross.toLocaleString('en-GB')} — règle des relevant UK earnings) :
+            cette part n’ouvre <b>aucun</b> droit à relief fiscal.
+          </p>
+        )}
         <button
           className="btn secondary"
           style={{ marginTop: 10 }}
-          onClick={() => exportSippPdf(yearSipp, band, taxYear)}
+          onClick={() => exportSippPdf(yearSipp, band, taxYear, settings?.sippProfile)}
         >
           📄 Export PDF SIPP
         </button>

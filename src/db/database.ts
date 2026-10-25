@@ -1,6 +1,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { CategoryId } from '../lib/categories'
-import type { TaxBand } from '../lib/sipp'
+import type { SippProfile, TaxBand } from '../lib/sipp'
+import { DEFAULT_SIPP_PROFILE } from '../lib/sipp'
 
 export interface ReceiptRecord {
   id: string
@@ -38,6 +39,12 @@ export interface SettingsRecord {
   id: 'settings'
   taxBand: TaxBand
   defaultSource: 'rental' | 'sipp' | 'other'
+  /** Fiscal profile used to calibrate SIPP limits and the income-tax estimate. */
+  sippProfile: SippProfile
+  /** Other taxable income (salary, dividends...) outside rental, for the tax estimate. */
+  otherTaxableIncome: number
+  /** True to elect the £1,000 property allowance instead of actual expenses. */
+  usePropertyAllowance: boolean
 }
 
 interface TaxTrackDB extends DBSchema {
@@ -60,22 +67,32 @@ interface TaxTrackDB extends DBSchema {
     key: string
     value: SettingsRecord
   }
+  /** Keys of deadlines the user has marked as done ("date|kind"). */
+  doneDeadlines: {
+    key: string
+    value: { key: string }
+  }
 }
 
 const DB_NAME = 'taxtrack-uk'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 let dbPromise: Promise<IDBPDatabase<TaxTrackDB>> | null = null
 
 export function getDB(): Promise<IDBPDatabase<TaxTrackDB>> {
   if (!dbPromise) {
     dbPromise = openDB<TaxTrackDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        db.createObjectStore('receipts', { keyPath: 'id' }).createIndex('byDate', 'date')
-        db.createObjectStore('receipts').createIndex('byCategory', 'category')
-        db.createObjectStore('rental', { keyPath: 'id' }).createIndex('byDate', 'date')
-        db.createObjectStore('sipp', { keyPath: 'id' }).createIndex('byDate', 'date')
-        db.createObjectStore('settings', { keyPath: 'id' })
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('receipts', { keyPath: 'id' }).createIndex('byDate', 'date')
+          db.createObjectStore('receipts').createIndex('byCategory', 'category')
+          db.createObjectStore('rental', { keyPath: 'id' }).createIndex('byDate', 'date')
+          db.createObjectStore('sipp', { keyPath: 'id' }).createIndex('byDate', 'date')
+          db.createObjectStore('settings', { keyPath: 'id' })
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('doneDeadlines', { keyPath: 'key' })
+        }
       },
     })
   }
@@ -150,6 +167,9 @@ export async function getSettings(): Promise<SettingsRecord> {
     id: 'settings',
     taxBand: 'basic',
     defaultSource: 'rental',
+    sippProfile: DEFAULT_SIPP_PROFILE,
+    otherTaxableIncome: 0,
+    usePropertyAllowance: false,
   }
   await db.put('settings', defaults)
   return defaults
@@ -158,4 +178,50 @@ export async function getSettings(): Promise<SettingsRecord> {
 export async function saveSettings(settings: SettingsRecord): Promise<void> {
   const db = await getDB()
   await db.put('settings', settings)
+}
+
+/** Backfill missing fields for users upgrading from DB v1. */
+export async function getSettingsMigrated(): Promise<SettingsRecord> {
+  const db = await getDB()
+  const existing = await db.get('settings', 'settings')
+  const defaults: SettingsRecord = {
+    id: 'settings',
+    taxBand: 'basic',
+    defaultSource: 'rental',
+    sippProfile: DEFAULT_SIPP_PROFILE,
+    otherTaxableIncome: 0,
+    usePropertyAllowance: false,
+  }
+  if (!existing) {
+    await db.put('settings', defaults)
+    return defaults
+  }
+  const needsMigration =
+    existing.sippProfile === undefined ||
+    existing.otherTaxableIncome === undefined ||
+    existing.usePropertyAllowance === undefined
+  const merged: SettingsRecord = {
+    ...defaults,
+    ...existing,
+    sippProfile: existing.sippProfile ?? defaults.sippProfile,
+  }
+  if (needsMigration) await db.put('settings', merged)
+  return merged
+}
+
+// ---------- Done deadlines ----------
+
+export async function listDoneDeadlines(): Promise<Set<string>> {
+  const db = await getDB()
+  const all = await db.getAll('doneDeadlines')
+  return new Set(all.map((d) => d.key))
+}
+
+export async function markDeadlineDone(key: string, done: boolean): Promise<void> {
+  const db = await getDB()
+  if (done) {
+    await db.put('doneDeadlines', { key })
+  } else {
+    await db.delete('doneDeadlines', key)
+  }
 }

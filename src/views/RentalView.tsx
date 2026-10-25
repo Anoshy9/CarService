@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   addRentalEntry,
   deleteRentalEntry,
+  getSettingsMigrated,
   listRentalEntries,
   newId,
+  saveSettings,
   type RentalRecord,
+  type SettingsRecord,
 } from '../db/database'
 import { CATEGORIES, getCategory, sumByCategory, type CategoryId } from '../lib/categories'
-import { summariseRental } from '../lib/rental'
+import { propertyAllowanceIsBetter, summariseRental } from '../lib/rental'
 import { isInTaxYear, listRecentTaxYears, parseISODate, toISODate, formatTaxYear, type TaxYear } from '../lib/taxYear'
 import { downloadBlob, exportRentalPdf, rentalCsv } from '../lib/export'
 
@@ -15,6 +18,7 @@ export function RentalView() {
   const years = useMemo(() => listRecentTaxYears(5), [])
   const [selectedYear, setSelectedYear] = useState<TaxYear>(() => years[years.length - 1])
   const [entries, setEntries] = useState<RentalRecord[]>([])
+  const [settings, setSettings] = useState<SettingsRecord | null>(null)
 
   // Manual entry form
   const [category, setCategory] = useState<CategoryId>('council_tax')
@@ -26,11 +30,20 @@ export function RentalView() {
 
   useEffect(() => {
     refresh()
+    getSettingsMigrated().then(setSettings)
   }, [])
 
+  const useAllowance = settings?.usePropertyAllowance ?? false
   const yearEntries = entries.filter((e) => isInTaxYear(parseISODate(e.date), selectedYear))
-  const summary = summariseRental(yearEntries)
+  const summary = summariseRental(yearEntries, { usePropertyAllowance: useAllowance })
   const totals = sumByCategory(yearEntries)
+
+  const toggleAllowance = async () => {
+    if (!settings) return
+    const next = { ...settings, usePropertyAllowance: !settings.usePropertyAllowance }
+    setSettings(next)
+    await saveSettings(next)
+  }
 
   const moveYear = (delta: number) => {
     const idx = years.findIndex((y) => y.label === selectedYear.label)
@@ -64,13 +77,23 @@ export function RentalView() {
 
   const handleExportCsv = () => {
     downloadBlob(
-      new Blob([rentalCsv(yearEntries, selectedYear)], { type: 'text/csv;charset=utf-8' }),
+      new Blob([rentalCsv(yearEntries, selectedYear, { usePropertyAllowance: useAllowance })], { type: 'text/csv;charset=utf-8' }),
       `taxtrack-location-${formatTaxYear(selectedYear).replace('/', '-')}.csv`,
     )
   }
 
   const expenseCategories = CATEGORIES.filter((c) => c.deductible || c.taxCredit)
+  const capitalCategories = CATEGORIES.filter((c) => c.capital)
   const incomeCategories = CATEGORIES.filter((c) => c.income)
+
+  const allowanceRecommended =
+    !summary.propertyAllowanceExempt &&
+    !useAllowance &&
+    propertyAllowanceIsBetter(
+      summary.income,
+      summary.deductibleExpenses,
+      summary.financeCostCredit,
+    )
 
   return (
     <>
@@ -91,17 +114,39 @@ export function RentalView() {
           <span className="label">Revenus locatifs</span>
           <span className="value positive">£{summary.income.toFixed(2)}</span>
         </div>
-        <div className="row">
-          <span className="label">Frais déductibles</span>
-          <span className="value negative">−£{summary.deductibleExpenses.toFixed(2)}</span>
-        </div>
+        {summary.propertyAllowanceExempt && (
+          <p className="ocr-status" style={{ background: '#f0fdf4', color: '#15803d', marginTop: 8 }}>
+            ✅ Revenus ≤ £1,000 : exonérés via la property allowance (s.783B), rien à déclarer.
+          </p>
+        )}
+        {!summary.propertyAllowanceExempt && !useAllowance && (
+          <div className="row">
+            <span className="label">Frais déductibles</span>
+            <span className="value negative">−£{summary.deductibleExpenses.toFixed(2)}</span>
+          </div>
+        )}
+        {summary.capitalExpenditure > 0 && (
+          <div className="row">
+            <span className="label">
+              Améliorations (capital)
+              <span className="sub">non déductibles — conservées pour le CGT en cas de vente</span>
+            </span>
+            <span className="value">£{summary.capitalExpenditure.toFixed(2)}</span>
+          </div>
+        )}
         <div className="row">
           <span className="label">
             Bénéfice imposable
-            <span className="sub">avant crédit d’impôt sur les intérêts</span>
+            <span className="sub">
+              {summary.propertyAllowanceElected
+                ? 'revenus − £1,000 (property allowance)'
+                : summary.propertyAllowanceExempt
+                  ? 'exonéré'
+                  : 'avant crédit d’impôt sur les intérêts'}
+            </span>
           </span>
-          <span className={`value ${summary.profit >= 0 ? 'positive' : 'negative'}`}>
-            £{summary.profit.toFixed(2)}
+          <span className={`value ${summary.taxableProfit >= 0 ? 'positive' : 'negative'}`}>
+            £{summary.taxableProfit.toFixed(2)}
           </span>
         </div>
         {summary.financeCostCredit > 0 && (
@@ -112,6 +157,27 @@ export function RentalView() {
             </span>
             <span className="value positive">£{summary.financeCostCredit.toFixed(2)}</span>
           </div>
+        )}
+        {!summary.propertyAllowanceExempt && (
+          <>
+            <div className="row" onClick={toggleAllowance} style={{ cursor: 'pointer' }}>
+              <span className="label">
+                Abattement forfaitaire £1,000 (property allowance)
+                <span className="sub">
+                  {useAllowance
+                    ? 'activé : remplace tous les frais, y compris le crédit sur les intérêts'
+                    : 'désactivé : frais réels déclarés'}
+                </span>
+              </span>
+              <input type="checkbox" checked={useAllowance} readOnly />
+            </div>
+            {allowanceRecommended && (
+              <p className="ocr-status" style={{ background: '#f0fdf4', color: '#15803d', marginTop: 8 }}>
+                💡 Tes frais réels (£{summary.deductibleExpenses.toFixed(2)}) sont inférieurs à £1,000 :
+                l’abattement forfaitaire serait plus avantageux. Coche la case ci-dessus.
+              </p>
+            )}
+          </>
         )}
       </div>
 
@@ -135,6 +201,13 @@ export function RentalView() {
                     {c.label}
                   </option>
                 ))}
+            </optgroup>
+            <optgroup label="Capital (non déductible, CGT)">
+              {capitalCategories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
             </optgroup>
             <optgroup label="Crédit d’impôt">
               {expenseCategories
@@ -181,6 +254,7 @@ export function RentalView() {
             <span className="label">
               {c.label}
               {c.taxCredit && <span className="sub">crédit d’impôt 20 %</span>}
+              {c.capital && <span className="sub">capital — non déductible (base cost CGT)</span>}
             </span>
             <span className="value">£{totals[c.id].toFixed(2)}</span>
           </div>
@@ -215,16 +289,20 @@ export function RentalView() {
           <button className="btn" onClick={handleExportCsv}>
             ⬇️ Export CSV
           </button>
-          <button className="btn secondary" onClick={() => exportRentalPdf(yearEntries, selectedYear)}>
+          <button
+            className="btn secondary"
+            onClick={() => exportRentalPdf(yearEntries, selectedYear, { usePropertyAllowance: useAllowance })}
+          >
             📄 Export PDF
           </button>
         </div>
       </div>
 
       <p className="disclaimer">
-        ⚠️ Estimation à titre indicatif. Les règles HMRC (notamment le traitement des intérêts
-        d’emprunt, le « replacement domestic items relief » et les abattements) doivent être
-        vérifiées avec un comptable ou sur gov.uk avant ta Self Assessment.
+        ⚠️ Estimation à titre indicatif. Points à vérifier avec un comptable : réparations
+        déductibles vs améliorations (capital), RDIR (remplacement « like-for-like » d’objets
+        mobiliers uniquement), « wholly and exclusively », pertes locatives reportables uniquement
+        sur de futurs revenus locatifs, et base « cash basis » jusqu’à £150,000 de recettes.
       </p>
     </>
   )

@@ -14,6 +14,7 @@ export type CategoryId =
   | 'insurance'
   | 'repairs_maintenance'
   | 'replacement_furniture' // replacement domestic items relief
+  | 'improvements' // capital: NOT deductible, added to the CGT base cost
   | 'legal_accounting'
   | 'advertising'
   | 'travel'
@@ -30,6 +31,8 @@ export interface Category {
   income: boolean
   /** True when it is only a tax credit at basic rate (mortgage interest). */
   taxCredit: boolean
+  /** True when it is capital expenditure (improvement): not deductible, kept for CGT base cost. */
+  capital: boolean
   description: string
 }
 
@@ -40,6 +43,7 @@ export const CATEGORIES: Category[] = [
     deductible: false,
     income: true,
     taxCredit: false,
+    capital: false,
     description: 'Revenus locatifs bruts perçus sur l’année fiscale.',
   },
   {
@@ -48,6 +52,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Taxe d’habitation locale payée par le propriétaire.',
   },
   {
@@ -56,6 +61,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Factures d’eau et de tout-à-l’égout.',
   },
   {
@@ -64,6 +70,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Loyer foncier (leasehold).',
   },
   {
@@ -72,6 +79,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Charges de copropriété (leasehold).',
   },
   {
@@ -80,6 +88,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Frais de gestion locative et de mise en location.',
   },
   {
@@ -88,6 +97,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Assurance propriétaire / locative.',
   },
   {
@@ -96,15 +106,26 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
-    description: 'Entretien et réparations (pas les améliorations).',
+    capital: false,
+    description: 'Réparations et entretien « wholly and exclusively » pour la location. Les réparations initiales au moment de l’achat ne sont PAS déductibles.',
   },
   {
     id: 'replacement_furniture',
-    label: 'Remplacement mobilier',
+    label: 'Remplacement mobilier (RDIR)',
     deductible: true,
     income: false,
     taxCredit: false,
-    description: 'Remplacement d’équipements domestiques (relief).',
+    capital: false,
+    description: 'Replacement Domestic Items Relief : remplacement « like-for-like » d’objets mobiliers (meubles, électroménager, literie) — pas les installations encastrées (chaudière, salle de bains). Livraison/installation incluses, moins les produits de cession de l’ancien bien.',
+  },
+  {
+    id: 'improvements',
+    label: 'Améliorations (capital)',
+    deductible: false,
+    income: false,
+    taxCredit: false,
+    capital: true,
+    description: 'Travaux d’amélioration (ex : extension, rénovation complète, nouvelle chaudière en remplacement d’un système vétuste). NON déductible du revenu locatif — à conserver pour le calcul du CGT (base cost) lors d’une vente.',
   },
   {
     id: 'legal_accounting',
@@ -112,6 +133,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Honoraires d’avocat, comptable, tenue de livres.',
   },
   {
@@ -120,6 +142,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Annonces pour trouver un locataire.',
   },
   {
@@ -128,6 +151,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Frais de déplacement liés à la gestion du bien.',
   },
   {
@@ -136,15 +160,17 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Factures payées par le propriétaire.',
   },
   {
     id: 'mortgage_interest',
-    label: 'Intérêts d’emprunt',
+    label: 'Intérêts d’emprunt (Section 24)',
     deductible: false,
     income: false,
     taxCredit: true,
-    description: 'Crédit d’impôt à taux de base (20 %), plafonné, pas une déduction de revenu.',
+    capital: false,
+    description: 'Crédit d’impôt à taux de base (20 %) sur les intérêts — jamais déduit du bénéfice (case 44 du SA105).',
   },
   {
     id: 'other',
@@ -152,6 +178,7 @@ export const CATEGORIES: Category[] = [
     deductible: true,
     income: false,
     taxCredit: false,
+    capital: false,
     description: 'Toute autre dépense déductible liée à la location.',
   },
 ]
