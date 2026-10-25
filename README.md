@@ -1,32 +1,43 @@
-# 2-agents
+# 🇬🇧 TaxTrack UK
 
-Deux agents IA qui débattent entre eux dans un scénario [Make](https://www.make.com).
+PWA mobile pour préparer sa **Self Assessment** britannique (HMRC) quand on loue un
+appartement en Angleterre et qu'on verse sur une **SIPP** (retraite personnelle).
 
-| Agent | Rôle | Modèle |
-|-------|------|--------|
-| Urbaniste | Spécialiste de l'urbanisme français | Claude |
-| Avocat | Spécialiste du droit français | Mistral (module Mistral AI) |
+## Fonctionnalités
 
-## Fichiers
+- 📸 **Reçus** : photographie les reçus, **OCR** (Tesseract.js, en local sur l'appareil)
+  qui extrait automatiquement le commerçant, le montant et la date. Photo conservée comme
+  justificatif.
+- 🏠 **Location** : suivi des revenus et de tous les frais déductibles d'un propriétaire
+  britannique (council tax, charges, agence, réparations, mobilier, assurance, déplacements,
+  intérêts d'emprunt traités en **crédit d'impôt à 20 %**, etc.), par **année fiscale UK**
+  (6 avril → 5 avril).
+- 💷 **SIPP** : suivi des versements, calcul du *gross-up* (le provider réclame 20 % de relief
+  de base), du relief complémentaire selon ta tranche (base / supérieur / additionnel) et du
+  **plafond annuel de £60,000** (brut).
+- 📊 **Tableau de bord** + **export CSV / PDF** par année fiscale, prêt à transmettre à un
+  comptable.
+- 📱 **PWA installable** : fonctionne hors-ligne, toutes les données restent **sur l'appareil**
+  (IndexedDB) — rien n'est envoyé sur un serveur.
 
-- `prompt-urbaniste.md` : prompt système et message utilisateur de l'urbaniste
-- `prompt-avocat.md` : prompt système et message utilisateur de l'avocat
+## Lancer le projet
 
-## Structure du scénario Make
+```bash
+npm install
+npm run dev      # serveur de dev
+npm test         # tests unitaires (vitest)
+npm run build    # build de production dans dist/
+```
 
-1. **Déclencheur** : module manuel ou webhook avec le sujet du débat
-2. **Claude (urbaniste)** : position d'ouverture
-3. **Mistral (avocat)** : réponse
-4. **Claude puis Mistral** : répliques (2 à 3 tours)
-5. **Synthèse** : points d'accord et de désaccord
-6. **Sortie** : Google Docs, Gmail ou Google Sheets
+Pour tester sur téléphone : `npm run dev -- --host` puis ouvrir l'URL réseau affichée,
+ou déployer le dossier `dist/` et l'**ajouter à l'écran d'accueil**.
 
-## Utilisation
+## ⚠️ Avertissement
 
-1. Créer un scénario dans Make et ajouter les modules ci-dessus.
-2. Copier le prompt de chaque agent dans le champ « System message ».
-3. Passer le sujet et l'historique du débat dans le message utilisateur (`{{sujet}}` et `{{historique}}`).
+TaxTrack UK organise vos données et calcule des **estimations**. Ce n'est **pas un conseil
+fiscal**. Les règles HMRC (intérêts d'emprunt, *replacement domestic items relief*, abattements,
+plafond annuel avec report sur 3 ans, *tapered annual allowance*) doivent être vérifiées avec
+un comptable ou sur [gov.uk](https://www.gov.uk) avant de soumettre votre déclaration.
 
-## Limites
-
-Les modèles peuvent inventer des articles de loi ou des décisions. Les prompts leur demandent de ne citer que ce dont ils sont certains, mais toute référence juridique doit être vérifiée (Légifrance) avant usage. Ce projet est un exercice et ne remplace pas un conseil juridique.
+Échéances Self Assessment : **31 octobre** (papier) / **31 janvier** (en ligne) pour l'année
+fiscale précédente.
