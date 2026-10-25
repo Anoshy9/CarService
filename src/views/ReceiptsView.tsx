@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { CameraCapture } from '../components/CameraCapture'
 import { ReceiptForm } from '../components/ReceiptForm'
+import { ManualReceiptForm } from '../components/ManualReceiptForm'
 import { deleteReceipt, listReceipts, type ReceiptRecord } from '../db/database'
 import { getCategory } from '../lib/categories'
 
-type Stage = 'idle' | 'camera' | 'form'
+type Stage = 'idle' | 'camera' | 'form' | 'manual'
 
 export function ReceiptsView() {
   const [receipts, setReceipts] = useState<ReceiptRecord[]>([])
@@ -58,6 +59,18 @@ export function ReceiptsView() {
     )
   }
 
+  if (stage === 'manual') {
+    return (
+      <ManualReceiptForm
+        onSaved={() => {
+          setStage('idle')
+          refresh()
+        }}
+        onCancel={() => setStage('idle')}
+      />
+    )
+  }
+
   return (
     <>
       <div className="card">
@@ -70,15 +83,22 @@ export function ReceiptsView() {
           <span className="label">Number of receipts</span>
           <span className="value">{receipts.length}</span>
         </div>
-        <button className="btn" style={{ marginTop: 12 }} onClick={() => setStage('camera')}>
-          📷 Photograph a receipt
-        </button>
+        <div className="camera-actions" style={{ marginTop: 12 }}>
+          <button className="btn" onClick={() => setStage('camera')}>
+            📷 Photograph a receipt
+          </button>
+          <button className="btn secondary" onClick={() => setStage('manual')}>
+            ✏️ Manual entry
+          </button>
+        </div>
       </div>
 
       <div className="card">
         <h2>History</h2>
         {receipts.length === 0 && (
-          <p className="empty-state">No receipts yet. Photograph your first receipt!</p>
+          <p className="empty-state">
+            No receipts yet. Photograph one or add a manual entry!
+          </p>
         )}
         {receipts.map((r) => (
           <div
@@ -87,7 +107,11 @@ export function ReceiptsView() {
             onClick={() => setSelected(r)}
             style={{ cursor: 'pointer' }}
           >
-            <img className="receipt-thumb" src={r.thumbnail} alt="" />
+            {r.thumbnail ? (
+              <img className="receipt-thumb" src={r.thumbnail} alt="" />
+            ) : (
+              <div className="receipt-thumb-placeholder">✏️</div>
+            )}
             <div className="receipt-info">
               <div className="t">{r.merchant}</div>
               <div className="d">
@@ -95,6 +119,7 @@ export function ReceiptsView() {
               </div>
               <span className="badge">
                 {r.source === 'rental' ? '🏠 Rental' : r.source === 'sipp' ? '💷 SIPP' : '📦 Other'}
+                {r.manual ? ' · ✏️ manual' : ''}
               </span>
             </div>
             <span className="receipt-amount">£{r.amount.toFixed(2)}</span>
@@ -118,11 +143,16 @@ export function ReceiptsView() {
         >
           <div className="card" style={{ maxWidth: 420, width: '100%' }} onClick={(e) => e.stopPropagation()}>
             <h2>{selected.merchant}</h2>
-            <img
-              src={URL.createObjectURL(selected.photo)}
-              alt="Receipt"
-              style={{ width: '100%', borderRadius: 12, marginBottom: 12 }}
-            />
+            {selected.photo && selected.photo.size > 0 && (
+              <img
+                src={URL.createObjectURL(selected.photo)}
+                alt="Receipt"
+                style={{ width: '100%', borderRadius: 12, marginBottom: 12 }}
+              />
+            )}
+            {selected.manual && (
+              <p style={{ fontSize: 13, color: '#64748b', marginTop: -4 }}>✏️ Manual entry (no photo)</p>
+            )}
             <div className="row">
               <span className="label">Amount</span>
               <span className="value">£{selected.amount.toFixed(2)}</span>

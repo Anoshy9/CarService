@@ -5,9 +5,9 @@ import { DEFAULT_SIPP_PROFILE } from '../lib/sipp'
 
 export interface ReceiptRecord {
   id: string
-  /** Blob of the original photo, kept for proof / re-OCR. */
+  /** Blob of the original photo, kept for proof / re-OCR. Empty for manual entries. */
   photo: Blob
-  /** Data-URL thumbnail for fast list rendering. */
+  /** Data-URL thumbnail for fast list rendering. Empty for manual entries. */
   thumbnail: string
   merchant: string
   amount: number
@@ -17,6 +17,8 @@ export interface ReceiptRecord {
   /** "rental" entries feed the property summary, "sipp" is informational. */
   source: 'rental' | 'sipp' | 'other'
   createdAt: string
+  /** True when entered manually (no photo). */
+  manual?: boolean
 }
 
 export interface RentalRecord {
